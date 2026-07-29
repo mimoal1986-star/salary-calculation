@@ -1,7 +1,9 @@
-# data_cleaner.py
-
+"""
+Логика очистки данных
+"""
 
 import pandas as pd
+import numpy as np
 from utils import normalize_text
 
 # Разрешенные менеджеры (проверяем по колонке ACC)
@@ -17,6 +19,13 @@ ALLOWED_MANAGERS = [
     "Голдакова Светлана"
 ]
 
+# Словарь замен для колонки ACC
+ACC_REPLACEMENTS = {
+    "Koordinator57": "Яцевич Максим",
+    "Koordinator26": "Голдакова Светлана",
+    "Koordinator63": "Воронин Евгений"
+}
+
 
 def clean_data(df):
     """
@@ -31,11 +40,14 @@ def clean_data(df):
     
     deleted_rows = []
     
+    # ============ ПРЕДВАРИТЕЛЬНАЯ ОБРАБОТКА: замены в колонке ACC ============
+    working_df['ACC'] = working_df['ACC'].replace(ACC_REPLACEMENTS)
+    
     # ============ ШАГ 1: Фильтрация по менеджерам (колонка ACC) ============
+    # Векторизованная фильтрация
     allowed_lower = [normalize_text(m) for m in ALLOWED_MANAGERS]
-    manager_mask = working_df['ACC'].apply(
-        lambda x: normalize_text(x) in allowed_lower
-    )
+    acc_normalized = working_df['ACC'].astype(str).str.strip().str.lower()
+    manager_mask = acc_normalized.isin(allowed_lower)
     
     # Собираем удаленные
     deleted = working_df[~manager_mask].copy()
@@ -46,41 +58,48 @@ def clean_data(df):
     # Оставляем только разрешенных
     working_df = working_df[manager_mask].copy()
     
-    # ============ ШАГ 2: Стандартизация типов проекта ============
+    # ============ ШАГ 2: Стандартизация типов проекта (векторизовано) ============
     if not working_df.empty:
-        def standardize_project_type_with_original(row):
-            project_type = normalize_text(row['Тип проекта (р/бр/неполевой)'])
-            client_name = normalize_text(row['ClientName'])
-            original_value = row['Тип проекта (р/бр/неполевой)']  # Сохраняем исходное значение
-            
-            # Шаг 1: Мултон
-            if client_name == "мултон":
-                return "Мултон"
-            
-            # Шаг 2: Мониторинги
-            if "монитор" in project_type:
-                return "Мониторинги"
-            
-            # Шаг 3: Опросы
-            if "опрос" in project_type:
-                return "Опросы"
-            
-            # Шаг 4: Ротационный (есть "ротац", нет "без")
-            if "ротац" in project_type:
-                if "без" not in project_type:
-                    return "Ротационный"
-                else:
-                    return "Безротационный"
-            
-            # Шаг 6: Не определен - возвращаем ИСХОДНОЕ значение
-            return original_value
+        # Подготавливаем данные
+        project_type_norm = working_df['Тип проекта (р/бр/неполевой)'].astype(str).str.strip().str.lower()
+        client_name_norm = working_df['ClientName'].astype(str).str.strip().str.lower()
+        original_values = working_df['Тип проекта (р/бр/неполевой)']
         
-        # Применяем стандартизацию
-        working_df['Тип проекта (р/бр/неполевой)'] = working_df.apply(
-            standardize_project_type_with_original, axis=1
+        # Создаем условия для каждого типа
+        conditions = [
+            # Шаг 1: Мултон
+            client_name_norm == "мултон",
+            # Шаг 2: Мониторинги
+            project_type_norm.str.contains("монитор", na=False),
+            # Шаг 3: Опросы
+            project_type_norm.str.contains("опрос", na=False),
+            # Шаг 4: Ротационный (есть "ротац", нет "без")
+            (project_type_norm.str.contains("ротац", na=False)) & 
+            (~project_type_norm.str.contains("без", na=False)),
+            # Шаг 5: Безротационный (есть "ротац" и есть "без")
+            (project_type_norm.str.contains("ротац", na=False)) & 
+            (project_type_norm.str.contains("без", na=False))
+        ]
+        
+        # Соответствующие значения
+        choices = [
+            "Мултон",
+            "Мониторинги",
+            "Опросы",
+            "Ротационный",
+            "Безротационный"
+        ]
+        
+        # Применяем векторизованное присвоение
+        # Если ни одно условие не подошло - оставляем исходное значение
+        default = original_values
+        working_df['Тип проекта (р/бр/неполевой)'] = np.select(
+            conditions, 
+            choices, 
+            default=default
         )
         
-        # Определяем, какие строки были НЕ определены (их тип не изменился)
+        # Определяем, какие строки были НЕ определены
         valid_types = ["Мултон", "Мониторинги", "Опросы", "Ротационный", "Безротационный"]
         invalid_type_mask = ~working_df['Тип проекта (р/бр/неполевой)'].isin(valid_types)
         
@@ -91,24 +110,19 @@ def clean_data(df):
         
         working_df = working_df[~invalid_type_mask].copy()
     
-    # ============ ШАГ 3: Фильтрация по столбцу "Проекты" ============
+    # ============ ШАГ 3: Фильтрация по столбцу "Проекты" (векторизовано) ============
     if not working_df.empty:
-        def process_project(value):
-            if pd.isna(value):
-                return value
-            
-            val_str = str(value)
-            # Ищем "холост" (без учета регистра)
-            if "холост" in val_str.lower():
-                return "_SINGLE"
-            return val_str
+        # Векторизованная замена "холост" на "_SINGLE"
+        projects = working_df['Проекты'].astype(str)
+        projects_clean = projects.str.strip()
         
-        working_df['Проекты'] = working_df['Проекты'].apply(process_project)
+        # Создаем маску для "холост"
+        holost_mask = projects_clean.str.lower().str.contains("холост", na=False)
+        working_df['Проекты'] = np.where(holost_mask, "_SINGLE", projects)
         
-        # Удаляем строки, где Проекты начинается с "_" (кроме "_SINGLE")
-        project_mask = working_df['Проекты'].apply(
-            lambda x: str(x).startswith('_') and str(x) != '_SINGLE'
-        )
+        # Векторизованная фильтрация проектов, начинающихся с "_" (кроме "_SINGLE")
+        projects_str = working_df['Проекты'].astype(str)
+        project_mask = projects_str.str.startswith('_') & (projects_str != '_SINGLE')
         
         deleted = working_df[project_mask].copy()
         if not deleted.empty:
@@ -117,13 +131,11 @@ def clean_data(df):
         
         working_df = working_df[~project_mask].copy()
     
-    # ============ ШАГ 4: Фильтрация по ClientName и ВСЕГО ============
+    # ============ ШАГ 4: Фильтрация по ClientName и ВСЕГО (векторизовано) ============
     if not working_df.empty:
-        # Находим "Тамбовский бекон" с ВСЕГО = 0
-        tambov_mask = (
-            (working_df['ClientName'].apply(normalize_text) == "тамбовский бекон") &
-            (working_df['ВСЕГО'] == 0)
-        )
+        # Векторизованная фильтрация
+        client_norm = working_df['ClientName'].astype(str).str.strip().str.lower()
+        tambov_mask = (client_norm == "тамбовский бекон") & (working_df['ВСЕГО'] == 0)
         
         deleted = working_df[tambov_mask].copy()
         if not deleted.empty:
