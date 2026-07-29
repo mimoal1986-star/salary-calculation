@@ -4,7 +4,7 @@
 import pandas as pd
 from utils import normalize_text
 
-# Разрешенные менеджеры
+# Разрешенные АСМ
 ALLOWED_MANAGERS = [
     "Аблязимова Екатерина",
     "Герасимова Светлана",
@@ -31,16 +31,16 @@ def clean_data(df):
     
     deleted_rows = []
     
-    # ============ ШАГ 1: Фильтрация по менеджерам ============
+    # ============ ШАГ 1: Фильтрация по АСМ ============
     allowed_lower = [normalize_text(m) for m in ALLOWED_MANAGERS]
-    manager_mask = working_df['Менеджер'].apply(
+    manager_mask = working_df['АСС'].apply(
         lambda x: normalize_text(x) in allowed_lower
     )
     
     # Собираем удаленные
     deleted = working_df[~manager_mask].copy()
     if not deleted.empty:
-        deleted['Причина_удаления'] = "Менеджер не в списке"
+        deleted['Причина_удаления'] = "АСМ не в списке"
         deleted_rows.append(deleted)
     
     # Оставляем только разрешенных
