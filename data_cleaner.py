@@ -4,7 +4,7 @@
 import pandas as pd
 from utils import normalize_text
 
-# Разрешенные АСМ
+# Разрешенные менеджеры (проверяем по колонке ACC)
 ALLOWED_MANAGERS = [
     "Аблязимова Екатерина",
     "Герасимова Светлана",
@@ -31,7 +31,7 @@ def clean_data(df):
     
     deleted_rows = []
     
-    # ============ ШАГ 1: Фильтрация по АСМ ============
+    # ============ ШАГ 1: Фильтрация по менеджерам (колонка ACC) ============
     allowed_lower = [normalize_text(m) for m in ALLOWED_MANAGERS]
     manager_mask = working_df['ACC'].apply(
         lambda x: normalize_text(x) in allowed_lower
@@ -40,18 +40,18 @@ def clean_data(df):
     # Собираем удаленные
     deleted = working_df[~manager_mask].copy()
     if not deleted.empty:
-        deleted['Причина_удаления'] = "АСМ не в списке"
+        deleted['Причина_удаления'] = "Менеджер не в списке"
         deleted_rows.append(deleted)
     
     # Оставляем только разрешенных
     working_df = working_df[manager_mask].copy()
     
     # ============ ШАГ 2: Стандартизация типов проекта ============
-    # Проверяем, что есть данные для обработки
     if not working_df.empty:
-        def standardize_project_type(row):
+        def standardize_project_type_with_original(row):
             project_type = normalize_text(row['Тип проекта (р/бр/неполевой)'])
             client_name = normalize_text(row['ClientName'])
+            original_value = row['Тип проекта (р/бр/неполевой)']  # Сохраняем исходное значение
             
             # Шаг 1: Мултон
             if client_name == "мултон":
@@ -72,16 +72,18 @@ def clean_data(df):
                 else:
                     return "Безротационный"
             
-            # Шаг 6: Не определен
-            return "Не определен"
+            # Шаг 6: Не определен - возвращаем ИСХОДНОЕ значение
+            return original_value
         
         # Применяем стандартизацию
         working_df['Тип проекта (р/бр/неполевой)'] = working_df.apply(
-            standardize_project_type, axis=1
+            standardize_project_type_with_original, axis=1
         )
         
-        # Удаляем строки с "Не определен"
-        invalid_type_mask = working_df['Тип проекта (р/бр/неполевой)'] == "Не определен"
+        # Определяем, какие строки были НЕ определены (их тип не изменился)
+        valid_types = ["Мултон", "Мониторинги", "Опросы", "Ротационный", "Безротационный"]
+        invalid_type_mask = ~working_df['Тип проекта (р/бр/неполевой)'].isin(valid_types)
+        
         deleted = working_df[invalid_type_mask].copy()
         if not deleted.empty:
             deleted['Причина_удаления'] = "Некорректный тип проекта"
