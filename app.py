@@ -35,6 +35,8 @@ if 'cleaned_rows' not in st.session_state:
     st.session_state.cleaned_rows = 0
 if 'deleted_rows' not in st.session_state:
     st.session_state.deleted_rows = 0
+if 'file_uploaded' not in st.session_state:
+    st.session_state.file_uploaded = False
 
 # ==================== ОСНОВНАЯ ОБЛАСТЬ ====================
 
@@ -47,9 +49,12 @@ uploaded_file = st.file_uploader(
 
 # Если загружен новый файл - сбрасываем состояние
 if uploaded_file is not None:
-    st.session_state.is_cleaned = False
-    st.session_state.cleaned_df = None
-    st.session_state.deleted_df = None
+    # Проверяем, изменился ли файл
+    if not st.session_state.file_uploaded or st.session_state.original_df is None:
+        st.session_state.is_cleaned = False
+        st.session_state.cleaned_df = None
+        st.session_state.deleted_df = None
+        st.session_state.file_uploaded = True
 
 if uploaded_file is not None:
     # Загрузка файла (только если изменился)
@@ -86,10 +91,8 @@ if uploaded_file is not None:
     if st.button("🚀 Запустить очистку", type="primary", use_container_width=True):
         with st.spinner("Выполняется очистка данных..."):
             try:
-                # Очистка
                 cleaned_df, deleted_df = clean_data(df)
                 
-                # Сохраняем в сессию
                 st.session_state.cleaned_df = cleaned_df
                 st.session_state.deleted_df = deleted_df
                 st.session_state.is_cleaned = True
@@ -97,6 +100,7 @@ if uploaded_file is not None:
                 st.session_state.deleted_rows = len(deleted_df)
                 
                 st.success("✅ Очистка завершена!")
+                st.rerun()
                 
             except Exception as e:
                 st.error(f"❌ Ошибка при очистке данных: {str(e)}")
@@ -126,11 +130,8 @@ if uploaded_file is not None:
             st.subheader("🗑️ Удаленные строки")
             st.info(f"Удалено {deleted_rows} строк(и)")
             
-            # Группировка по причинам
             if 'Причина_удаления' in deleted_df.columns:
                 reason_counts = deleted_df['Причина_удаления'].value_counts()
-                
-                # Создаем колонки для статистики по причинам
                 num_reasons = len(reason_counts)
                 cols = st.columns(min(num_reasons, 4))
                 
@@ -138,7 +139,6 @@ if uploaded_file is not None:
                     with cols[idx % 4]:
                         st.metric(reason, count)
             
-            # Функция для преобразования DataFrame к Arrow-совместимому формату
             def make_arrow_compatible(df_to_convert):
                 df_copy = df_to_convert.copy()
                 for col in df_copy.columns:
@@ -146,12 +146,10 @@ if uploaded_file is not None:
                         df_copy[col] = df_copy[col].astype(str)
                 return df_copy
             
-            # Показываем первые 10 удаленных строк
             with st.expander("Показать удаленные строки (первые 10)"):
                 display_df = make_arrow_compatible(deleted_df.head(10))
                 st.dataframe(display_df, use_container_width=True)
             
-            # Показываем все удаленные строки (опционально)
             if deleted_rows > 10:
                 with st.expander("Показать все удаленные строки"):
                     display_all_df = make_arrow_compatible(deleted_df)
@@ -167,7 +165,6 @@ if uploaded_file is not None:
         col1, col2 = st.columns(2)
         
         with col1:
-            # Создаем очищенный файл
             cleaned_excel = create_cleaned_excel(cleaned_df)
             cleaned_filename = get_filename("Массив_итоги_месяца", "очищенный")
             
@@ -182,7 +179,6 @@ if uploaded_file is not None:
         
         with col2:
             if deleted_rows > 0:
-                # Создаем файл с удаленными
                 deleted_excel = create_deleted_excel(deleted_df)
                 deleted_filename = get_filename("Массив_итоги_месяца", "удаленный")
                 
@@ -197,14 +193,12 @@ if uploaded_file is not None:
             else:
                 st.info("📭 Нет удаленных строк для скачивания")
         
-        # Возможность загрузить новый файл
         st.markdown("---")
         st.info("🔄 Чтобы обработать другой файл, загрузите его заново")
 
 else:
     st.info("👈 Загрузите Excel-файл для начала работы")
     
-    # Показываем пример структуры
     with st.expander("📋 Ожидаемая структура файла"):
         st.write("Файл должен содержать следующие колонки:")
         cols = [
@@ -219,7 +213,6 @@ else:
             "Бонус", "ВСЕГО"
         ]
         
-        # Разбиваем на 4 колонки для красивого отображения
         col1, col2, col3, col4 = st.columns(4)
         for i, col in enumerate(cols):
             if i % 4 == 0:
@@ -231,7 +224,6 @@ else:
             else:
                 col4.write(f"• {col}")
     
-    # Показываем информацию о правилах очистки
     with st.expander("📌 Правила очистки"):
         st.markdown("""
         **1. Фильтрация по менеджерам**
