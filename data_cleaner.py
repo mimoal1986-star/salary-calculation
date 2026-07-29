@@ -33,7 +33,7 @@ def clean_data(df):
     
     # ============ ШАГ 1: Фильтрация по АСМ ============
     allowed_lower = [normalize_text(m) for m in ALLOWED_MANAGERS]
-    manager_mask = working_df['АСС'].apply(
+    manager_mask = working_df['ACC'].apply(
         lambda x: normalize_text(x) in allowed_lower
     )
     
