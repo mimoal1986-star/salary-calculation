@@ -26,6 +26,13 @@ ACC_REPLACEMENTS = {
     "Koordinator63": "Воронин Евгений"
 }
 
+# Словарь переименования колонок
+COLUMN_RENAME_MAP = {
+    "ACC": "ASM",
+    "ЭМ": "RS",
+    "логин эм": "Логин RS"
+}
+
 
 def clean_data(df):
     """
@@ -110,9 +117,9 @@ def clean_data(df):
             if "опрос" in project_type:
                 return "Опросы"
             
-            # Шаг 4: Ротационный (есть "ротац", нет "без")
+            # Шаг 4: Ротационный (есть "ротац", нет "б")
             if "ротац" in project_type:
-                if "без" not in project_type:
+                if "б" not in project_type:
                     return "Ротационный"
                 else:
                     return "Безротационный"
@@ -176,15 +183,24 @@ def clean_data(df):
         working_df = working_df[~tambov_mask].copy()
     
     # ============ ФОРМИРУЕМ РЕЗУЛЬТАТ ============
+    # Удаляем колонку Причина_удаления из очищенного
     if not working_df.empty and 'Причина_удаления' in working_df.columns:
         cleaned_df = working_df.drop(columns=['Причина_удаления'])
     else:
         cleaned_df = working_df
     
+    # Переименовываем колонки в очищенном
+    cleaned_df = cleaned_df.rename(columns=COLUMN_RENAME_MAP)
+    
+    # Удаленные строки
     if deleted_rows:
         deleted_df = pd.concat(deleted_rows, ignore_index=True)
+        # Переименовываем колонки в удаленном
+        deleted_df = deleted_df.rename(columns=COLUMN_RENAME_MAP)
     else:
         all_columns = df.columns.tolist() + ['Причина_удаления']
-        deleted_df = pd.DataFrame(columns=all_columns)
+        # Переименовываем колонки для пустого DataFrame
+        all_columns_renamed = [COLUMN_RENAME_MAP.get(col, col) for col in all_columns]
+        deleted_df = pd.DataFrame(columns=all_columns_renamed)
     
     return cleaned_df, deleted_df
