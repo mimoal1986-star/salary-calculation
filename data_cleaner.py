@@ -1,3 +1,4 @@
+# ==================== data_cleaner.py ====================
 """
 Логика очистки данных
 """
@@ -33,6 +34,17 @@ def clean_data(df):
     """
     # Создаем копию для работы
     working_df = df.copy()
+    
+    # ============ ДОБАВЛЕНИЕ НОВЫХ КОЛОНОК ============
+    # 1. Добавляем колонку "сцеп" в начало (перед Портал)
+    working_df.insert(0, 'сцеп', working_df['ClientName'].astype(str) + '&' + working_df['BranchName'].astype(str))
+    
+    # 2. Добавляем колонки "ЭМ" и "логин эм" после "ВСЕГО"
+    # Находим позицию колонки "ВСЕГО"
+    total_col_index = working_df.columns.get_loc('ВСЕГО')
+    # Вставляем после "ВСЕГО"
+    working_df.insert(total_col_index + 1, 'ЭМ', '')
+    working_df.insert(total_col_index + 2, 'логин эм', '')
     
     # Добавляем колонку для отслеживания причины удаления
     working_df['Причина_удаления'] = ""
