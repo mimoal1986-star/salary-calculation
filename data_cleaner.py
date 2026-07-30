@@ -41,7 +41,7 @@ def clean_data(df):
     """
     # Создаем копию для работы
     working_df = df.copy()
-    
+
     # ============ ДОБАВЛЕНИЕ НОВЫХ КОЛОНОК ============
     # 1. Добавляем колонку "сцеп" в начало (перед Портал)
     working_df.insert(0, 'сцеп', working_df['ClientName'].astype(str) + '&' + working_df['BranchName'].astype(str))
@@ -75,6 +75,11 @@ def clean_data(df):
     # Вставляем колонки по одной, начиная с позиции после ВСЕГО
     for i, col_name in enumerate(new_columns_after_total):
         working_df.insert(total_col_index + 1 + i, col_name, '')
+    
+    # ============ ПЕРЕНАСЕНИЕ ДАННЫХ ИЗ КОЛОНКИ ЭМ ============
+    # Если в исходном файле есть колонка "ЭМ" - переносим значения в новую колонку "ЭМ"
+    if 'ЭМ' in df.columns:
+        working_df['ЭМ'] = df['ЭМ']
     
     # Добавляем колонку для отслеживания причины удаления
     working_df['Причина_удаления'] = ""
