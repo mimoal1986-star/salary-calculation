@@ -35,10 +35,10 @@ def load_from_json(name):
 
 def load_region_type(file):
     """
-    Загружает справочник Регион-Тип
+    Загружает справочник Регион-ДВ
     
     Ожидаемая структура:
-    Lo | Тип
+    Lo | ДВ
     ДВ | Обычная
     AA | Сложная
     """
@@ -46,21 +46,21 @@ def load_region_type(file):
         df = pd.read_excel(file, engine='openpyxl')
         
         # Проверяем наличие колонок
-        if 'Lo' not in df.columns or 'Тип' not in df.columns:
+        if 'Lo' not in df.columns or 'ДВ' not in df.columns:
             return {
                 'status': 'error',
-                'message': "Файл должен содержать колонки 'Lo' и 'Тип'"
+                'message': "Файл должен содержать колонки 'Lo' и 'ДВ'"
             }
         
         # Оставляем только нужные колонки
-        df = df[['Lo', 'Тип']].copy()
+        df = df[['Lo', 'ДВ']].copy()
         
         # Очищаем от пустых строк
-        df = df.dropna(subset=['Lo', 'Тип'])
+        df = df.dropna(subset=['Lo', 'ДВ'])
         
         # Проверяем допустимые значения
         valid_types = ['Обычная', 'Сложная']
-        invalid = df[~df['Тип'].isin(valid_types)]
+        invalid = df[~df['ДВ'].isin(valid_types)]
         
         return {
             'status': 'success',
