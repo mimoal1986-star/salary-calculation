@@ -3,7 +3,14 @@ import streamlit as st
 import pandas as pd
 
 from data_loader import load_excel, validate_columns
-from data_cleaner import clean_data, fill_rs_and_em
+from data_cleaner import (
+    clean_data,
+    fill_rs_and_em,
+    fill_project_motivation,
+    fill_region_type,
+    fill_separate_motivation,
+    fill_quota
+)
 from report_generator import create_cleaned_excel, create_deleted_excel, get_filename
 from settings_loader import (
     load_region_type,
@@ -171,13 +178,35 @@ with tab1:
                     # Шаг 1: Очистка данных
                     cleaned_df, deleted_df = clean_data(df)
                     
-                    # Шаг 2: Заполнение Логин RS и ЭМ
+                    # Шаг 2: Заполнение Логин RS и RS (бывшая ЭМ)
                     if st.session_state.projects_outside_checker_df is not None:
                         cleaned_df = fill_rs_and_em(
                             cleaned_df,
                             st.session_state.projects_outside_checker_df,
                             st.session_state.name_login_df
                         )
+                    
+                    # Шаг 3: Заполнение Проектная мотивация
+                    project_motivation_data = load_from_json_github('project_motivation')
+                    if project_motivation_data is not None:
+                        project_motivation_df = pd.DataFrame(project_motivation_data['data'])
+                        cleaned_df, invalid_projects = fill_project_motivation(cleaned_df, project_motivation_df)
+                        if invalid_projects:
+                            st.warning(f"⚠️ Проекты с мотивацией ≠ 1: {', '.join(invalid_projects)}")
+                    
+                    # Шаг 4: Заполнение Тип квоты (Регион-Тип)
+                    region_type_data = load_from_json_github('region_type')
+                    if region_type_data is not None:
+                        region_type_df = pd.DataFrame(region_type_data['data'])
+                        cleaned_df, invalid_regions = fill_region_type(cleaned_df, region_type_df)
+                        if invalid_regions:
+                            st.warning(f"⚠️ Регионы не найдены в справочнике: {', '.join(invalid_regions)}")
+                    
+                    # Шаг 5: Заполнение отдельная мотивация = ЧТО-ТО - ВСЕГО
+                    cleaned_df = fill_separate_motivation(cleaned_df)
+                    
+                    # Шаг 6: Заполнение квота = количество записей по Логин RS
+                    cleaned_df = fill_quota(cleaned_df)
                     
                     st.session_state.cleaned_excel = create_cleaned_excel(cleaned_df)
                     if not deleted_df.empty:
@@ -194,6 +223,7 @@ with tab1:
                 except Exception as e:
                     st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
                     st.exception(e)
+            
         
         # ==================== СКАЧИВАНИЕ ====================
         if st.session_state.is_cleaned:
