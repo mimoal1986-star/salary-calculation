@@ -207,7 +207,7 @@ def clean_data(df):
 
 def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
     """
-    Заполняет колонки Логин RS и ЭМ
+    Заполняет колонки Логин RS и RS (бывшая ЭМ)
     
     Args:
         cleaned_df: очищенный массив (DataFrame) - уже с переименованными колонками
@@ -219,7 +219,7 @@ def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
     """
     df = cleaned_df.copy()
     
-    # ============ ШАГ 1: Заполнение Логин RS ============
+    # ============ ШАГ 1: Заполнение Логин RS из "Проекты вне чеккера" ============
     if projects_df is not None and not projects_df.empty:
         # Создаем словарь для быстрого поиска
         project_dict = {}
@@ -234,28 +234,47 @@ def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
         
         df['Логин RS'] = df.apply(get_login_rs, axis=1)
     
-    # ============ ШАГ 2: Дозаполнение RS (бывшая ЭМ) ============
+    # ============ ШАГ 2: Дозаполнение Логин RS через RS (если пусто) ============
     if name_login_df is not None and not name_login_df.empty:
-        # Создаем словарь: логин эм → ЭМ (полное имя)
-        name_dict = {}
+        # Создаем два словаря:
+        # 1. логин эм → ЭМ (полное имя)
+        # 2. ЭМ (полное имя) → логин эм (обратный поиск)
+        login_to_name = {}
+        name_to_login = {}
         for _, row in name_login_df.iterrows():
             login = str(row['логин эм']).strip()
             name = str(row['ЭМ']).strip()
-            name_dict[login] = name
+            login_to_name[login] = name
+            name_to_login[name] = login
         
-        # Проверяем, нужно ли заполнять RS (бывшая ЭМ)
+        # Дозаполняем Логин RS через RS
+        def fill_login_rs(row):
+            login_rs = str(row['Логин RS']).strip()
+            rs_value = str(row['RS']).strip()
+            
+            # Если Логин RS пустой и RS заполнена
+            if login_rs == '' and rs_value != '':
+                # Ищем RS (полное имя) в словаре name_to_login
+                if rs_value in name_to_login:
+                    return name_to_login[rs_value]
+            
+            return row['Логин RS']
+        
+        df['Логин RS'] = df.apply(fill_login_rs, axis=1)
+        
+        # ============ ШАГ 3: Заполнение RS (бывшая ЭМ) ============
         def get_rs(row):
-            rs_value = str(row['RS']).strip()  # ← теперь RS, а не ЭМ
+            rs_value = str(row['RS']).strip()
             login_rs = str(row['Логин RS']).strip()
             
             # Проверяем, что RS пустая или содержит - / 0 / koordinator
             if rs_value == '' or rs_value == '-' or rs_value == '0' or 'koordinator' in rs_value.lower():
                 # Ищем в словаре по логин rs
-                if login_rs in name_dict:
-                    return name_dict[login_rs]
+                if login_rs in login_to_name:
+                    return login_to_name[login_rs]
             
-            return row['RS']  # ← теперь RS, а не ЭМ
+            return row['RS']
         
-        df['RS'] = df.apply(get_rs, axis=1)  # ← теперь RS, а не ЭМ
+        df['RS'] = df.apply(get_rs, axis=1)
     
     return df
