@@ -356,38 +356,32 @@ def fill_region_type(cleaned_df, region_type_df):
     
     return df, invalid_regions
 
-
 def fill_separate_motivation(cleaned_df):
     """
-    Заполняет колонку отдельная мотивация = ЧТО-ТО - ВСЕГО
+    Заполняет колонку отдельная мотивация
     
-    Args:
-        cleaned_df: очищенный массив (DataFrame)
-    
-    Returns:
-        DataFrame с заполненной колонкой отдельная мотивация
+    Логика:
+    - Если проектная мотивация = 1 → отдельная мотивация = ЧТО-ТО - ВСЕГО
+    - Иначе → отдельная мотивация = пусто
     """
     df = cleaned_df.copy()
     
-    # Преобразуем колонки в числа, ошибки заменяем на 0
+    # Преобразуем колонки в числа
     df['ЧТО-ТО'] = pd.to_numeric(df['ЧТО-ТО'], errors='coerce').fillna(0)
     df['ВСЕГО'] = pd.to_numeric(df['ВСЕГО'], errors='coerce').fillna(0)
+    df['проектная мотивация'] = pd.to_numeric(df['проектная мотивация'], errors='coerce').fillna(0)
     
-    # отдельная мотивация = ЧТО-ТО - ВСЕГО
-    df['отдельная мотивация'] = df['ЧТО-ТО'] - df['ВСЕГО']
+    # Если проектная мотивация = 1 → ЧТО-ТО - ВСЕГО, иначе пусто
+    df['отдельная мотивация'] = df.apply(
+        lambda row: row['ЧТО-ТО'] - row['ВСЕГО'] if row['проектная мотивация'] == 1 else '',
+        axis=1
+    )
     
     return df
-
 
 def fill_quota(cleaned_df):
     """
     Заполняет колонку квота = количество записей по каждому Логин RS
-    
-    Args:
-        cleaned_df: очищенный массив (DataFrame)
-    
-    Returns:
-        DataFrame с заполненной колонкой квота
     """
     df = cleaned_df.copy()
     
