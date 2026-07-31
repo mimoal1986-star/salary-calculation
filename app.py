@@ -8,8 +8,6 @@ from report_generator import create_cleaned_excel, create_deleted_excel, get_fil
 from settings_loader import (
     load_region_type,
     load_project_motivation,
-    save_to_json,
-    load_from_json,
     save_to_json_github,
     load_from_json_github
 )
@@ -179,9 +177,9 @@ with tab1:
                 try:
                     df_shtrafy = pd.read_excel(zp_file, engine='openpyxl')
                     st.session_state.zp_shtrafy_df = df_shtrafy
-                    st.success(f"✅ Загружено {len(df_shtrafy)} записей")
+                    st.toast(f"✅ Загружено {len(df_shtrafy)} записей", icon="✅")
                 except Exception as e:
-                    st.error(f"❌ Ошибка: {str(e)}")
+                    st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
     
     with col2:
         st.caption("Имя-Логин RS")
@@ -196,9 +194,9 @@ with tab1:
                 try:
                     df_login = pd.read_excel(login_file, engine='openpyxl')
                     st.session_state.name_login_rs_df = df_login
-                    st.success(f"✅ Загружено {len(df_login)} записей")
+                    st.toast(f"✅ Загружено {len(df_login)} записей", icon="✅")
                 except Exception as e:
-                    st.error(f"❌ Ошибка: {str(e)}")
+                    st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
     
     with col3:
         st.caption("Хвосты")
@@ -213,9 +211,9 @@ with tab1:
                 try:
                     df_hvosty = pd.read_excel(hvosty_file, engine='openpyxl')
                     st.session_state.hvosty_df = df_hvosty
-                    st.success(f"✅ Загружено {len(df_hvosty)} записей")
+                    st.toast(f"✅ Загружено {len(df_hvosty)} записей", icon="✅")
                 except Exception as e:
-                    st.error(f"❌ Ошибка: {str(e)}")
+                    st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
 
 # ==================== ВКЛАДКА 2: НАСТРОЙКИ ====================
 with tab2:
@@ -240,11 +238,6 @@ with tab2:
             region_data = load_from_json_github('region_type')
             if region_data is not None:
                 st.caption(f"📅 Последняя загрузка: {region_data.get('last_upload', 'неизвестно')}")
-            else:
-                # Пробуем загрузить локально
-                region_data = load_from_json('region_type')
-                if region_data is not None:
-                    st.caption(f"📅 Последняя загрузка (локально): {region_data.get('last_upload', 'неизвестно')}")
         except Exception as e:
             st.caption("⚠️ Не удалось загрузить из GitHub")
     
@@ -266,27 +259,15 @@ with tab2:
                 st.dataframe(result['data'], use_container_width=True)
                 
                 # Кнопка "Сохранить в GitHub"
-                col1_btn, col2_btn = st.columns(2)
-                with col1_btn:
-                    if st.button("💾 Сохранить локально", key="save_region_local"):
-                        save_to_json('region_type', {
+                if st.button("💾 Сохранить в GitHub", key="save_region_github"):
+                    try:
+                        save_to_json_github('region_type', {
                             'data': result['data'].to_dict('records'),
                             'last_upload': result['last_upload']
                         })
-                        st.success("✅ Справочник 'Регион-Тип' сохранен локально!")
-                        st.rerun()
-                
-                with col2_btn:
-                    if st.button("💾 Сохранить в GitHub", key="save_region_github"):
-                        try:
-                            save_to_json_github('region_type', {
-                                'data': result['data'].to_dict('records'),
-                                'last_upload': result['last_upload']
-                            })
-                            st.success("✅ Справочник 'Регион-Тип' сохранен в GitHub!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"❌ Ошибка сохранения в GitHub: {str(e)}")
+                        st.toast("✅ Справочник 'Регион-Тип' сохранен в GitHub!", icon="✅")
+                    except Exception as e:
+                        st.toast(f"❌ Ошибка сохранения в GitHub: {str(e)}", icon="❌")
     
     st.markdown("---")
     
@@ -307,10 +288,6 @@ with tab2:
             project_data = load_from_json_github('project_motivation')
             if project_data is not None:
                 st.caption(f"📅 Последняя загрузка: {project_data.get('last_upload', 'неизвестно')}")
-            else:
-                project_data = load_from_json('project_motivation')
-                if project_data is not None:
-                    st.caption(f"📅 Последняя загрузка (локально): {project_data.get('last_upload', 'неизвестно')}")
         except Exception as e:
             st.caption("⚠️ Не удалось загрузить из GitHub")
     
@@ -332,24 +309,12 @@ with tab2:
                 st.dataframe(result['data'], use_container_width=True)
                 
                 # Кнопка "Сохранить в GitHub"
-                col1_btn, col2_btn = st.columns(2)
-                with col1_btn:
-                    if st.button("💾 Сохранить локально", key="save_project_local"):
-                        save_to_json('project_motivation', {
+                if st.button("💾 Сохранить в GitHub", key="save_project_github"):
+                    try:
+                        save_to_json_github('project_motivation', {
                             'data': result['data'].to_dict('records'),
                             'last_upload': result['last_upload']
                         })
-                        st.success("✅ Справочник 'Проект-Мотивация' сохранен локально!")
-                        st.rerun()
-                
-                with col2_btn:
-                    if st.button("💾 Сохранить в GitHub", key="save_project_github"):
-                        try:
-                            save_to_json_github('project_motivation', {
-                                'data': result['data'].to_dict('records'),
-                                'last_upload': result['last_upload']
-                            })
-                            st.success("✅ Справочник 'Проект-Мотивация' сохранен в GitHub!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"❌ Ошибка сохранения в GitHub: {str(e)}")
+                        st.toast("✅ Справочник 'Проект-Мотивация' сохранен в GitHub!", icon="✅")
+                    except Exception as e:
+                        st.toast(f"❌ Ошибка сохранения в GitHub: {str(e)}", icon="❌")
