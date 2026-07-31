@@ -491,3 +491,75 @@ def fill_closing_coefficient_rate_salary(cleaned_df, hvosty_df):
     df = df.drop(columns=['хвосты_count', 'закрытие_процент', 'мотивация_1_count'])
     
     return df
+
+def fill_recruit_adjustments(cleaned_df, zp_shtrafy_df):
+    """
+    Заполняет колонки: рекрут, рекрут на анкету, корректировка,
+    корректировка на анкету, корректировка холостых, Итого затраты на эм
+    
+    Args:
+        cleaned_df: очищенный массив (DataFrame)
+        zp_shtrafy_df: справочник "ЗП_штрафы" (DataFrame)
+    
+    Returns:
+        DataFrame с заполненными колонками
+    """
+    df = cleaned_df.copy()
+    
+    # Считаем количество строк с проектная мотивация = 1 по каждому Логин RS
+    motivation_1_counts = df[df['проектная мотивация'] == 1].groupby('Логин RS').size().to_dict()
+    df['мотивация_1_count'] = df['Логин RS'].map(motivation_1_counts).fillna(0).astype(int)
+    
+    # Знаменатель для рекрут на анкету и корректировка на анкету
+    df['denominator'] = df['квота'] - df['мотивация_1_count']
+    df['denominator'] = df['denominator'].apply(lambda x: x if x > 0 else 1)  # Защита от деления на 0
+    
+    # ============ 1. Рекрут ============
+    if zp_shtrafy_df is not None and not zp_shtrafy_df.empty:
+        # Считаем количество записей по логин эм в ЗП_штрафы
+        recruit_counts = zp_shtrafy_df.groupby('логин эм').size().to_dict()
+        
+        # Рекрут = COUNT * 300
+        df['рекрут'] = df['Логин RS'].map(recruit_counts).fillna(0).astype(int) * 300
+    else:
+        df['рекрут'] = 0
+    
+    # ============ 2. Рекрут на анкету ============
+    df['рекрут на анкету'] = df.apply(
+        lambda row: row['рекрут'] / row['denominator'] if row['denominator'] > 0 else 0,
+        axis=1
+    )
+    
+    # ============ 3. Корректировка ============
+    if zp_shtrafy_df is not None and not zp_shtrafy_df.empty:
+        # Суммируем штраф/премия по логин эм ЧЕКЕР
+        adjustment_sums = zp_shtrafy_df.groupby('логин эм ЧЕКЕР')['штраф/премия'].sum().to_dict()
+        
+        df['корректировка'] = df['Логин RS'].map(adjustment_sums).fillna(0)
+    else:
+        df['корректировка'] = 0
+    
+    # ============ 4. Корректировка на анкету ============
+    df['корректировка на анкету'] = df.apply(
+        lambda row: row['корректировка'] / row['denominator'] if row['denominator'] > 0 else 0,
+        axis=1
+    )
+    
+    # ============ 5. Корректировка холостых ============
+    df['корректировка холостых'] = df.apply(
+        lambda row: -row['зп эм'] / 2 if str(row['Проекты']).strip() == '_SINGLE' else '',
+        axis=1
+    )
+    
+    # ============ 6. Итого затраты на эм ============
+    # Преобразуем все в числа для суммирования
+    cols_to_sum = ['зп эм', 'надбавка на анкету', 'рекрут на анкету', 'корректировка на анкету', 'корректировка холостых']
+    for col in cols_to_sum:
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+    
+    df['Итого затраты на эм'] = df[cols_to_sum].sum(axis=1)
+    
+    # Удаляем вспомогательные колонки
+    df = df.drop(columns=['мотивация_1_count', 'denominator'])
+    
+    return df
