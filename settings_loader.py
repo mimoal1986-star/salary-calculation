@@ -178,14 +178,21 @@ def load_name_login(file):
         df = df[['логин эм', 'ЭМ']].copy()
         df = df.dropna(subset=['логин эм', 'ЭМ'])
         
-        # Проверка на дубликаты по логин эм
-        duplicates = df[df.duplicated(subset=['логин эм'], keep=False)]
+        # Находим полные дубликаты (совпадают и логин, и ФИО)
+        duplicates = df[df.duplicated(subset=['логин эм', 'ЭМ'], keep=False)]
+        duplicate_count = len(duplicates) if not duplicates.empty else 0
+        
+        # Удаляем полные дубликаты, оставляя первое вхождение
+        df_clean = df.drop_duplicates(subset=['логин эм', 'ЭМ'], keep='first')
+        removed_count = len(df) - len(df_clean)
         
         return {
             'status': 'success',
-            'data': df,
+            'data': df_clean,
             'invalid': duplicates if not duplicates.empty else None,
-            'last_upload': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            'last_upload': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'removed_duplicates': removed_count,
+            'duplicate_count': duplicate_count
         }
         
     except Exception as e:
