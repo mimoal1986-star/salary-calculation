@@ -8,6 +8,7 @@ from report_generator import create_cleaned_excel, create_deleted_excel, get_fil
 from settings_loader import (
     load_region_type,
     load_project_motivation,
+    load_name_login,
     save_to_json_github,
     load_from_json_github
 )
@@ -42,8 +43,8 @@ if 'columns_valid' not in st.session_state:
 # Для дополнительных справочников
 if 'zp_shtrafy_df' not in st.session_state:
     st.session_state.zp_shtrafy_df = None
-if 'name_login_rs_df' not in st.session_state:
-    st.session_state.name_login_rs_df = None
+if 'projects_outside_checker_df' not in st.session_state:
+    st.session_state.projects_outside_checker_df = None
 if 'hvosty_df' not in st.session_state:
     st.session_state.hvosty_df = None
 
@@ -97,7 +98,65 @@ with tab1:
         
         st.markdown("---")
         
-        # Кнопка запуска
+        # ==================== ДОПОЛНИТЕЛЬНЫЕ ЗАГРУЗЧИКИ ====================
+        st.subheader("📁 Дополнительные справочники")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.caption("ЗП_штрафы")
+            zp_file = st.file_uploader(
+                "Загрузите файл",
+                type=['xlsx', 'xls'],
+                key="zp_shtrafy",
+                label_visibility="collapsed"
+            )
+            if zp_file is not None:
+                with st.spinner("Загрузка ЗП_штрафы..."):
+                    try:
+                        df_shtrafy = pd.read_excel(zp_file, engine='openpyxl')
+                        st.session_state.zp_shtrafy_df = df_shtrafy
+                        st.toast(f"✅ Загружено {len(df_shtrafy)} записей", icon="✅")
+                    except Exception as e:
+                        st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
+        
+        with col2:
+            st.caption("Проекты вне чеккера")
+            projects_file = st.file_uploader(
+                "Загрузите файл",
+                type=['xlsx', 'xls'],
+                key="projects_outside_checker",
+                label_visibility="collapsed"
+            )
+            if projects_file is not None:
+                with st.spinner("Загрузка Проекты вне чеккера..."):
+                    try:
+                        df_projects = pd.read_excel(projects_file, engine='openpyxl')
+                        st.session_state.projects_outside_checker_df = df_projects
+                        st.toast(f"✅ Загружено {len(df_projects)} записей", icon="✅")
+                    except Exception as e:
+                        st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
+        
+        with col3:
+            st.caption("Хвосты")
+            hvosty_file = st.file_uploader(
+                "Загрузите файл",
+                type=['xlsx', 'xls'],
+                key="hvosty",
+                label_visibility="collapsed"
+            )
+            if hvosty_file is not None:
+                with st.spinner("Загрузка Хвосты..."):
+                    try:
+                        df_hvosty = pd.read_excel(hvosty_file, engine='openpyxl')
+                        st.session_state.hvosty_df = df_hvosty
+                        st.toast(f"✅ Загружено {len(df_hvosty)} записей", icon="✅")
+                    except Exception as e:
+                        st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
+        
+        st.markdown("---")
+        
+        # ==================== КНОПКА ЗАПУСКА ====================
         if st.button("🚀 Запустить расчет", type="primary", use_container_width=True):
             with st.spinner("Выполняется расчет..."):
                 try:
@@ -119,7 +178,7 @@ with tab1:
                     st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
                     st.exception(e)
         
-        # Скачивание
+        # ==================== СКАЧИВАНИЕ ====================
         if st.session_state.is_cleaned:
             st.markdown("---")
             st.subheader("📥 Скачать результаты")
@@ -157,62 +216,6 @@ with tab1:
         st.info("👆 Загрузите Excel-файл для начала работы")
     
     st.markdown("---")
-    
-    # ==================== ДОПОЛНИТЕЛЬНЫЕ ЗАГРУЗЧИКИ ====================
-    st.subheader("📁 Дополнительные массивы")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.caption("ЗП_штрафы")
-        zp_file = st.file_uploader(
-            "Загрузите файл",
-            type=['xlsx', 'xls'],
-            key="zp_shtrafy",
-            label_visibility="collapsed"
-        )
-        if zp_file is not None:
-            with st.spinner("Загрузка ЗП_штрафы..."):
-                try:
-                    df_shtrafy = pd.read_excel(zp_file, engine='openpyxl')
-                    st.session_state.zp_shtrafy_df = df_shtrafy
-                    st.toast(f"✅ Загружено {len(df_shtrafy)} записей", icon="✅")
-                except Exception as e:
-                    st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
-    
-    with col2:
-        st.caption("Имя-Логин RS")
-        login_file = st.file_uploader(
-            "Загрузите файл",
-            type=['xlsx', 'xls'],
-            key="name_login_rs",
-            label_visibility="collapsed"
-        )
-        if login_file is not None:
-            with st.spinner("Загрузка Имя-Логин RS..."):
-                try:
-                    df_login = pd.read_excel(login_file, engine='openpyxl')
-                    st.session_state.name_login_rs_df = df_login
-                    st.toast(f"✅ Загружено {len(df_login)} записей", icon="✅")
-                except Exception as e:
-                    st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
-    
-    with col3:
-        st.caption("Хвосты")
-        hvosty_file = st.file_uploader(
-            "Загрузите файл",
-            type=['xlsx', 'xls'],
-            key="hvosty",
-            label_visibility="collapsed"
-        )
-        if hvosty_file is not None:
-            with st.spinner("Загрузка Хвосты..."):
-                try:
-                    df_hvosty = pd.read_excel(hvosty_file, engine='openpyxl')
-                    st.session_state.hvosty_df = df_hvosty
-                    st.toast(f"✅ Загружено {len(df_hvosty)} записей", icon="✅")
-                except Exception as e:
-                    st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
 
 # ==================== ВКЛАДКА 2: НАСТРОЙКИ ====================
 with tab2:
@@ -232,7 +235,6 @@ with tab2:
         )
     
     with col2:
-        # Загружаем из GitHub
         try:
             region_data = load_from_json_github('region_type')
             if region_data is not None:
@@ -257,7 +259,6 @@ with tab2:
                 
                 st.dataframe(result['data'], use_container_width=True)
                 
-                # Кнопка "Сохранить в GitHub"
                 if st.button("💾 Сохранить в GitHub", key="save_region_github"):
                     try:
                         save_to_json_github('region_type', {
@@ -307,7 +308,6 @@ with tab2:
                 
                 st.dataframe(result['data'], use_container_width=True)
                 
-                # Кнопка "Сохранить в GitHub"
                 if st.button("💾 Сохранить в GitHub", key="save_project_github"):
                     try:
                         save_to_json_github('project_motivation', {
@@ -315,5 +315,54 @@ with tab2:
                             'last_upload': result['last_upload']
                         })
                         st.toast("✅ Справочник 'Проект-Мотивация' сохранен в GitHub!", icon="✅")
+                    except Exception as e:
+                        st.toast(f"❌ Ошибка сохранения в GitHub: {str(e)}", icon="❌")
+    
+    st.markdown("---")
+    
+    # ==================== 2.3 ИМЯ-ЛОГИН ====================
+    st.markdown("#### 📁 Имя-логин")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        name_login_file = st.file_uploader(
+            "Загрузите Excel-файл 'Имя-логин'",
+            type=['xlsx', 'xls'],
+            key="name_login"
+        )
+    
+    with col2:
+        try:
+            name_login_data = load_from_json_github('name_login')
+            if name_login_data is not None:
+                st.caption(f"📅 Последняя загрузка: {name_login_data.get('last_upload', 'неизвестно')}")
+        except Exception as e:
+            st.caption("⚠️ Не удалось загрузить из GitHub")
+    
+    if name_login_file is not None:
+        with st.spinner("Загрузка справочника..."):
+            result = load_name_login(name_login_file)
+            
+            if result['status'] == 'error':
+                st.error(f"❌ {result['message']}")
+            else:
+                st.success(f"✅ Загружено {len(result['data'])} записей")
+                
+                if result.get('invalid') is not None and not result['invalid'].empty:
+                    st.warning("⚠️ Обнаружены дубликаты по колонке 'логин эм':")
+                    st.dataframe(result['invalid'], use_container_width=True)
+                else:
+                    st.info("✅ Все значения корректны")
+                
+                st.dataframe(result['data'], use_container_width=True)
+                
+                if st.button("💾 Сохранить в GitHub", key="save_name_login"):
+                    try:
+                        save_to_json_github('name_login', {
+                            'data': result['data'].to_dict('records'),
+                            'last_upload': result['last_upload']
+                        })
+                        st.toast("✅ Справочник 'Имя-логин' сохранен в GitHub!", icon="✅")
                     except Exception as e:
                         st.toast(f"❌ Ошибка сохранения в GitHub: {str(e)}", icon="❌")
