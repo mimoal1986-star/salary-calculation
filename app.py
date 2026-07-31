@@ -5,7 +5,14 @@ import pandas as pd
 from data_loader import load_excel, validate_columns
 from data_cleaner import clean_data
 from report_generator import create_cleaned_excel, create_deleted_excel, get_filename
-from settings_loader import load_region_type, load_project_motivation, save_to_json, load_from_json
+from settings_loader import (
+    load_region_type,
+    load_project_motivation,
+    save_to_json,
+    load_from_json,
+    save_to_json_github,
+    load_from_json_github
+)
 
 # ==================== НАСТРОЙКА СТРАНИЦЫ ====================
 st.set_page_config(
@@ -210,7 +217,6 @@ with tab1:
                 except Exception as e:
                     st.error(f"❌ Ошибка: {str(e)}")
 
-
 # ==================== ВКЛАДКА 2: НАСТРОЙКИ ====================
 with tab2:
     st.markdown("---")
@@ -234,6 +240,11 @@ with tab2:
             region_data = load_from_json_github('region_type')
             if region_data is not None:
                 st.caption(f"📅 Последняя загрузка: {region_data.get('last_upload', 'неизвестно')}")
+            else:
+                # Пробуем загрузить локально
+                region_data = load_from_json('region_type')
+                if region_data is not None:
+                    st.caption(f"📅 Последняя загрузка (локально): {region_data.get('last_upload', 'неизвестно')}")
         except Exception as e:
             st.caption("⚠️ Не удалось загрузить из GitHub")
     
@@ -255,16 +266,27 @@ with tab2:
                 st.dataframe(result['data'], use_container_width=True)
                 
                 # Кнопка "Сохранить в GitHub"
-                if st.button("💾 Сохранить Регион-Тип в GitHub", key="save_region"):
-                    try:
-                        save_to_json_github('region_type', {
+                col1_btn, col2_btn = st.columns(2)
+                with col1_btn:
+                    if st.button("💾 Сохранить локально", key="save_region_local"):
+                        save_to_json('region_type', {
                             'data': result['data'].to_dict('records'),
                             'last_upload': result['last_upload']
                         })
-                        st.success("✅ Справочник 'Регион-Тип' сохранен в GitHub!")
+                        st.success("✅ Справочник 'Регион-Тип' сохранен локально!")
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ Ошибка сохранения: {str(e)}")
+                
+                with col2_btn:
+                    if st.button("💾 Сохранить в GitHub", key="save_region_github"):
+                        try:
+                            save_to_json_github('region_type', {
+                                'data': result['data'].to_dict('records'),
+                                'last_upload': result['last_upload']
+                            })
+                            st.success("✅ Справочник 'Регион-Тип' сохранен в GitHub!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Ошибка сохранения в GitHub: {str(e)}")
     
     st.markdown("---")
     
@@ -285,6 +307,10 @@ with tab2:
             project_data = load_from_json_github('project_motivation')
             if project_data is not None:
                 st.caption(f"📅 Последняя загрузка: {project_data.get('last_upload', 'неизвестно')}")
+            else:
+                project_data = load_from_json('project_motivation')
+                if project_data is not None:
+                    st.caption(f"📅 Последняя загрузка (локально): {project_data.get('last_upload', 'неизвестно')}")
         except Exception as e:
             st.caption("⚠️ Не удалось загрузить из GitHub")
     
@@ -306,13 +332,24 @@ with tab2:
                 st.dataframe(result['data'], use_container_width=True)
                 
                 # Кнопка "Сохранить в GitHub"
-                if st.button("💾 Сохранить Проект-Мотивация в GitHub", key="save_project"):
-                    try:
-                        save_to_json_github('project_motivation', {
+                col1_btn, col2_btn = st.columns(2)
+                with col1_btn:
+                    if st.button("💾 Сохранить локально", key="save_project_local"):
+                        save_to_json('project_motivation', {
                             'data': result['data'].to_dict('records'),
                             'last_upload': result['last_upload']
                         })
-                        st.success("✅ Справочник 'Проект-Мотивация' сохранен в GitHub!")
+                        st.success("✅ Справочник 'Проект-Мотивация' сохранен локально!")
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ Ошибка сохранения: {str(e)}")
+                
+                with col2_btn:
+                    if st.button("💾 Сохранить в GitHub", key="save_project_github"):
+                        try:
+                            save_to_json_github('project_motivation', {
+                                'data': result['data'].to_dict('records'),
+                                'last_upload': result['last_upload']
+                            })
+                            st.success("✅ Справочник 'Проект-Мотивация' сохранен в GitHub!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Ошибка сохранения в GitHub: {str(e)}")
