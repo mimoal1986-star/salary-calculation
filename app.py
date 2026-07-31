@@ -113,11 +113,10 @@ with tab1:
                     st.session_state.cleaned_rows = len(cleaned_df)
                     st.session_state.deleted_rows = len(deleted_df)
                     
-                    st.success("✅ Расчет завершен!")
-                    st.rerun()
+                    st.toast("✅ Расчет завершен!", icon="✅")
                     
                 except Exception as e:
-                    st.error(f"❌ Ошибка: {str(e)}")
+                    st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
                     st.exception(e)
         
         # Скачивание
