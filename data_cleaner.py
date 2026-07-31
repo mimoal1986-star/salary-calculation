@@ -392,3 +392,102 @@ def fill_quota(cleaned_df):
     df['квота'] = df['Логин RS'].map(quota_counts).fillna(0).astype(int)
     
     return df
+
+def fill_closing_coefficient_rate_salary(cleaned_df, hvosty_df):
+    """
+    Заполняет колонки: закрытие, коэффициент, ставка, зп эм,
+    надбавка за квоту, надбавка на анкету
+    
+    Args:
+        cleaned_df: очищенный массив (DataFrame)
+        hvosty_df: справочник "Хвосты" (DataFrame)
+    
+    Returns:
+        DataFrame с заполненными колонками
+    """
+    df = cleaned_df.copy()
+    
+    # ============ 1. Считаем Хвосты по каждому Логин RS ============
+    hvosty_counts = {}
+    if hvosty_df is not None and not hvosty_df.empty:
+        # Считаем количество хвостов по колонке 'эм'
+        hvosty_counts = hvosty_df.groupby('эм').size().to_dict()
+    
+    # Добавляем колонку с количеством хвостов для каждого Логин RS
+    df['хвосты_count'] = df['Логин RS'].map(hvosty_counts).fillna(0).astype(int)
+    
+    # ============ 2. Закрытие ============
+    # Закрытие = Квота / (Квота + Хвосты)
+    df['закрытие'] = df.apply(
+        lambda row: row['квота'] / (row['квота'] + row['хвосты_count']) 
+        if (row['квота'] + row['хвосты_count']) > 0 else 0,
+        axis=1
+    )
+    # Округляем до 3 знаков и преобразуем в проценты для отображения
+    df['закрытие_процент'] = (df['закрытие'] * 100).round(2)
+    
+    # ============ 3. Коэффициент ============
+    def get_coefficient(closing):
+        if closing >= 1.0:
+            return 1.0
+        elif closing >= 0.99:
+            return 0.8
+        else:
+            return 0.45
+    
+    df['коэффициент'] = df['закрытие'].apply(get_coefficient)
+    
+    # ============ 4. Ставка ============
+    def get_rate(row):
+        region_type = str(row['Тип квоты']).strip()
+        project_type = str(row['Тип проекта (р/бр/неполевой)']).strip()
+        
+        # Определяем тип проекта (ротационный/безротационный)
+        is_rotational = 'ротационный' in project_type.lower()
+        
+        # Определяем тип региона
+        is_complex = 'сложная' in region_type.lower()
+        
+        if is_complex:
+            if is_rotational:
+                return 150  # Сложная + Ротация
+            else:
+                return 85   # Сложная + Без ротации
+        else:  # Обычная
+            if is_rotational:
+                return 90   # Обычная + Ротация
+            else:
+                return 50   # Обычная + Без ротации
+    
+    df['ставка'] = df.apply(get_rate, axis=1)
+    
+    # ============ 5. зп эм = ставка * коэффициент ============
+    df['зп эм'] = df['ставка'] * df['коэффициент']
+    
+    # ============ 6. надбавка за квоту ============
+    def get_bonus(quota):
+        if quota >= 550:
+            return 12000
+        elif quota >= 350:
+            return 8000
+        else:
+            return 0
+    
+    df['надбавка за квоту'] = df['квота'].apply(get_bonus)
+    
+    # ============ 7. надбавка на анкету ============
+    # Считаем количество строк с проектная мотивация = 1 по каждому Логин RS
+    motivation_1_counts = df[df['проектная мотивация'] == 1].groupby('Логин RS').size().to_dict()
+    df['мотивация_1_count'] = df['Логин RS'].map(motivation_1_counts).fillna(0).astype(int)
+    
+    # Надбавка на анкету = надбавка за квоту / (квота - кол-во строк с проектная мотивация = 1)
+    df['надбавка на анкету'] = df.apply(
+        lambda row: row['надбавка за квоту'] / (row['квота'] - row['мотивация_1_count'])
+        if (row['квота'] - row['мотивация_1_count']) > 0 else 0,
+        axis=1
+    )
+    
+    # Удаляем вспомогательные колонки
+    df = df.drop(columns=['хвосты_count', 'закрытие_процент', 'мотивация_1_count'])
+    
+    return df
