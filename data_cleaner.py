@@ -278,3 +278,123 @@ def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
         df['RS'] = df.apply(get_rs, axis=1)
     
     return df
+
+
+def fill_project_motivation(cleaned_df, project_motivation_df):
+    """
+    Заполняет колонку Проектная мотивация
+    
+    Args:
+        cleaned_df: очищенный массив (DataFrame)
+        project_motivation_df: справочник "Проект-Мотивация" (DataFrame)
+    
+    Returns:
+        DataFrame с заполненной колонкой Проектная мотивация
+        и список проектов с ошибками
+    """
+    df = cleaned_df.copy()
+    invalid_projects = []
+    
+    if project_motivation_df is not None and not project_motivation_df.empty:
+        # Создаем словарь: Имя проекта → Мотивация
+        motivation_dict = {}
+        for _, row in project_motivation_df.iterrows():
+            project_name = str(row['Имя проекта']).strip()
+            motivation = row['Мотивация']
+            
+            # Проверяем, что мотивация = 1
+            if motivation != 1:
+                invalid_projects.append(project_name)
+            
+            motivation_dict[project_name] = motivation
+        
+        # Заполняем Проектная мотивация
+        def get_motivation(row):
+            project = str(row['Проекты']).strip()
+            return motivation_dict.get(project, 0)
+        
+        df['проектная мотивация'] = df.apply(get_motivation, axis=1)
+    
+    return df, invalid_projects
+
+
+def fill_region_type(cleaned_df, region_type_df):
+    """
+    Заполняет колонку Тип квоты из справочника Регион-Тип
+    
+    Args:
+        cleaned_df: очищенный массив (DataFrame)
+        region_type_df: справочник "Регион-Тип" (DataFrame)
+    
+    Returns:
+        DataFrame с заполненной колонкой Тип квоты
+        и список регионов с ошибками
+    """
+    df = cleaned_df.copy()
+    invalid_regions = []
+    
+    if region_type_df is not None and not region_type_df.empty:
+        # Создаем словарь: Lo → ДВ (Тип)
+        region_dict = {}
+        for _, row in region_type_df.iterrows():
+            lo = str(row['Lo']).strip()
+            region_type = str(row['ДВ']).strip()
+            region_dict[lo] = region_type
+        
+        # Заполняем Тип квоты
+        def get_region_type(row):
+            region = str(row['RegionName согласно распределения АСС']).strip()
+            return region_dict.get(region, '')
+        
+        df['Тип квоты'] = df.apply(get_region_type, axis=1)
+        
+        # Находим регионы, которых нет в справочнике
+        all_regions = df['RegionName согласно распределения АСС'].astype(str).str.strip().unique()
+        missing_regions = [r for r in all_regions if r and r not in region_dict]
+        if missing_regions:
+            invalid_regions = missing_regions
+    
+    return df, invalid_regions
+
+
+def fill_separate_motivation(cleaned_df):
+    """
+    Заполняет колонку отдельная мотивация = ЧТО-ТО - ВСЕГО
+    
+    Args:
+        cleaned_df: очищенный массив (DataFrame)
+    
+    Returns:
+        DataFrame с заполненной колонкой отдельная мотивация
+    """
+    df = cleaned_df.copy()
+    
+    # Преобразуем колонки в числа, ошибки заменяем на 0
+    df['ЧТО-ТО'] = pd.to_numeric(df['ЧТО-ТО'], errors='coerce').fillna(0)
+    df['ВСЕГО'] = pd.to_numeric(df['ВСЕГО'], errors='coerce').fillna(0)
+    
+    # отдельная мотивация = ЧТО-ТО - ВСЕГО
+    df['отдельная мотивация'] = df['ЧТО-ТО'] - df['ВСЕГО']
+    
+    return df
+
+
+def fill_quota(cleaned_df):
+    """
+    Заполняет колонку квота = количество записей по каждому Логин RS
+    
+    Args:
+        cleaned_df: очищенный массив (DataFrame)
+    
+    Returns:
+        DataFrame с заполненной колонкой квота
+    """
+    df = cleaned_df.copy()
+    
+    # Считаем количество записей по каждому Логин RS
+    quota_counts = df.groupby('Логин RS').size().to_dict()
+    
+    # Заполняем квоту
+    df['квота'] = df['Логин RS'].map(quota_counts).fillna(0).astype(int)
+    
+    return df
