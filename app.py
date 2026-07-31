@@ -9,7 +9,8 @@ from data_cleaner import (
     fill_project_motivation,
     fill_region_type,
     fill_separate_motivation,
-    fill_quota
+    fill_quota,
+    fill_closing_coefficient_rate_salary  # ← НОВАЯ ФУНКЦИЯ
 )
 from report_generator import create_cleaned_excel, create_deleted_excel, get_filename
 from settings_loader import (
@@ -207,7 +208,10 @@ with tab1:
                     
                     # Шаг 6: Заполнение квота = количество записей по Логин RS
                     cleaned_df = fill_quota(cleaned_df)
-                    
+
+                    # Шаг 7: Заполнение закрытие, коэффициент, ставка, зп эм, надбавка за квоту, надбавка на анкету
+                    cleaned_df = fill_closing_coefficient_rate_salary(cleaned_df, st.session_state.hvosty_df)
+
                     st.session_state.cleaned_excel = create_cleaned_excel(cleaned_df)
                     if not deleted_df.empty:
                         st.session_state.deleted_excel = create_deleted_excel(deleted_df)
