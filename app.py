@@ -229,9 +229,13 @@ with tab2:
         )
     
     with col2:
-        region_data = load_from_json('region_type')
-        if region_data is not None:
-            st.caption(f"📅 Последняя загрузка: {region_data.get('last_upload', 'неизвестно')}")
+        # Загружаем из GitHub
+        try:
+            region_data = load_from_json_github('region_type')
+            if region_data is not None:
+                st.caption(f"📅 Последняя загрузка: {region_data.get('last_upload', 'неизвестно')}")
+        except Exception as e:
+            st.caption("⚠️ Не удалось загрузить из GitHub")
     
     if region_file is not None:
         with st.spinner("Загрузка справочника..."):
@@ -250,14 +254,17 @@ with tab2:
                 
                 st.dataframe(result['data'], use_container_width=True)
                 
-                # Кнопка "Сохранить"
-                if st.button("💾 Сохранить Регион-Тип", key="save_region"):
-                    save_to_json('region_type', {
-                        'data': result['data'].to_dict('records'),
-                        'last_upload': result['last_upload']
-                    })
-                    st.success("✅ Справочник 'Регион-Тип' сохранен!")
-                    st.rerun()
+                # Кнопка "Сохранить в GitHub"
+                if st.button("💾 Сохранить Регион-Тип в GitHub", key="save_region"):
+                    try:
+                        save_to_json_github('region_type', {
+                            'data': result['data'].to_dict('records'),
+                            'last_upload': result['last_upload']
+                        })
+                        st.success("✅ Справочник 'Регион-Тип' сохранен в GitHub!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Ошибка сохранения: {str(e)}")
     
     st.markdown("---")
     
@@ -274,9 +281,12 @@ with tab2:
         )
     
     with col2:
-        project_data = load_from_json('project_motivation')
-        if project_data is not None:
-            st.caption(f"📅 Последняя загрузка: {project_data.get('last_upload', 'неизвестно')}")
+        try:
+            project_data = load_from_json_github('project_motivation')
+            if project_data is not None:
+                st.caption(f"📅 Последняя загрузка: {project_data.get('last_upload', 'неизвестно')}")
+        except Exception as e:
+            st.caption("⚠️ Не удалось загрузить из GitHub")
     
     if project_file is not None:
         with st.spinner("Загрузка справочника..."):
@@ -295,11 +305,14 @@ with tab2:
                 
                 st.dataframe(result['data'], use_container_width=True)
                 
-                # Кнопка "Сохранить"
-                if st.button("💾 Сохранить Проект-Мотивация", key="save_project"):
-                    save_to_json('project_motivation', {
-                        'data': result['data'].to_dict('records'),
-                        'last_upload': result['last_upload']
-                    })
-                    st.success("✅ Справочник 'Проект-Мотивация' сохранен!")
-                    st.rerun()
+                # Кнопка "Сохранить в GitHub"
+                if st.button("💾 Сохранить Проект-Мотивация в GitHub", key="save_project"):
+                    try:
+                        save_to_json_github('project_motivation', {
+                            'data': result['data'].to_dict('records'),
+                            'last_upload': result['last_upload']
+                        })
+                        st.success("✅ Справочник 'Проект-Мотивация' сохранен в GitHub!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Ошибка сохранения: {str(e)}")
