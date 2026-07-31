@@ -215,6 +215,9 @@ with tab1:
                     
                     # Шаг 8: Заполнение рекрут, рекрут на анкету, корректировка, корректировка на анкету, корректировка холостых, Итого затраты на эм
                     cleaned_df = fill_recruit_adjustments(cleaned_df, st.session_state.zp_shtrafy_df)
+                    
+                    # Шаг 9: Округление всех дробных чисел до 2 знаков
+                    cleaned_df = cleaned_df.round(2)
 
                     st.session_state.cleaned_excel = create_cleaned_excel(cleaned_df)
                     if not deleted_df.empty:
