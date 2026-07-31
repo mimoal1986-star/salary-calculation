@@ -13,9 +13,7 @@ from datetime import datetime
 
 
 def save_to_json_github(name, data):
-    """
-    Сохраняет данные в JSON-файл в GitHub репозиторий через API
-    """
+    """Сохраняет данные в GitHub репозиторий через API"""
     token = st.secrets.get("GITHUB_TOKEN")
     username = st.secrets.get("GITHUB_USERNAME")
     repo = st.secrets.get("GITHUB_REPO")
@@ -32,11 +30,9 @@ def save_to_json_github(name, data):
         "Accept": "application/vnd.github.v3+json"
     }
     
-    # Кодируем данные в base64
     json_str = json.dumps(data, ensure_ascii=False, indent=2)
     encoded = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
     
-    # Проверяем, существует ли файл
     response = requests.get(url, headers=headers)
     
     payload = {
@@ -45,13 +41,11 @@ def save_to_json_github(name, data):
         "branch": "main"
     }
     
-    # Если файл существует, берем его SHA
     if response.status_code == 200:
         sha = response.json().get('sha')
         if sha:
             payload["sha"] = sha
     
-    # Отправляем запрос на создание/обновление файла
     response = requests.put(url, headers=headers, json=payload)
     
     if response.status_code in [200, 201]:
@@ -61,9 +55,7 @@ def save_to_json_github(name, data):
 
 
 def load_from_json_github(name):
-    """
-    Загружает данные из JSON-файла из GitHub репозитория
-    """
+    """Загружает данные из JSON из GitHub"""
     token = st.secrets.get("GITHUB_TOKEN")
     username = st.secrets.get("GITHUB_USERNAME")
     repo = st.secrets.get("GITHUB_REPO")
@@ -89,18 +81,14 @@ def load_from_json_github(name):
 
 
 def save_to_json(name, data):
-    """
-    Сохраняет данные в JSON-файл (локально, для совместимости)
-    """
+    """Сохраняет данные в JSON-файл локально"""
     filepath = f"{name}.json"
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def load_from_json(name):
-    """
-    Загружает данные из JSON-файла (локально, для совместимости)
-    """
+    """Загружает данные из локального JSON"""
     filepath = f"{name}.json"
     if os.path.exists(filepath):
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -109,14 +97,7 @@ def load_from_json(name):
 
 
 def load_region_type(file):
-    """
-    Загружает справочник Регион-Тип
-    
-    Ожидаемая структура:
-    Lo | ДВ
-    ДВ | Обычная
-    AA | Сложная
-    """
+    """Загружает справочник Регион-Тип"""
     try:
         df = pd.read_excel(file, engine='openpyxl')
         
@@ -147,13 +128,7 @@ def load_region_type(file):
 
 
 def load_project_motivation(file):
-    """
-    Загружает справочник Проект-Мотивация
-    
-    Ожидаемая структура:
-    Имя проекта | Мотивация
-    05.2026_Ёбидоёби | 1
-    """
+    """Загружает справочник Проект-Мотивация"""
     try:
         df = pd.read_excel(file, engine='openpyxl')
         
