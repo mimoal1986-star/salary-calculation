@@ -13,7 +13,9 @@ from datetime import datetime
 
 
 def save_to_json_github(name, data):
-    """Сохраняет данные в GitHub репозиторий через API"""
+    """
+    Сохраняет данные в GitHub репозиторий через API
+    """
     token = st.secrets.get("GITHUB_TOKEN")
     username = st.secrets.get("GITHUB_USERNAME")
     repo = st.secrets.get("GITHUB_REPO")
@@ -55,7 +57,9 @@ def save_to_json_github(name, data):
 
 
 def load_from_json_github(name):
-    """Загружает данные из JSON из GitHub"""
+    """
+    Загружает данные из JSON из GitHub
+    """
     token = st.secrets.get("GITHUB_TOKEN")
     username = st.secrets.get("GITHUB_USERNAME")
     repo = st.secrets.get("GITHUB_REPO")
@@ -80,24 +84,15 @@ def load_from_json_github(name):
     return None
 
 
-def save_to_json(name, data):
-    """Сохраняет данные в JSON-файл локально"""
-    filepath = f"{name}.json"
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-def load_from_json(name):
-    """Загружает данные из локального JSON"""
-    filepath = f"{name}.json"
-    if os.path.exists(filepath):
-        with open(filepath, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return None
-
-
 def load_region_type(file):
-    """Загружает справочник Регион-Тип"""
+    """
+    Загружает справочник Регион-Тип
+    
+    Ожидаемая структура:
+    Lo | ДВ
+    ДВ | Обычная
+    AA | Сложная
+    """
     try:
         df = pd.read_excel(file, engine='openpyxl')
         
@@ -128,7 +123,13 @@ def load_region_type(file):
 
 
 def load_project_motivation(file):
-    """Загружает справочник Проект-Мотивация"""
+    """
+    Загружает справочник Проект-Мотивация
+    
+    Ожидаемая структура:
+    Имя проекта | Мотивация
+    05.2026_Ёбидоёби | 1
+    """
     try:
         df = pd.read_excel(file, engine='openpyxl')
         
@@ -147,6 +148,43 @@ def load_project_motivation(file):
             'status': 'success',
             'data': df,
             'invalid': invalid if not invalid.empty else None,
+            'last_upload': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+    except Exception as e:
+        return {
+            'status': 'error',
+            'message': f"Ошибка загрузки: {str(e)}"
+        }
+
+
+def load_name_login(file):
+    """
+    Загружает справочник Имя-логин
+    
+    Ожидаемая структура:
+    логин эм | ЭМ
+    Koordinator10 | Екатерина Алексеевна Митюшкина
+    """
+    try:
+        df = pd.read_excel(file, engine='openpyxl')
+        
+        if 'логин эм' not in df.columns or 'ЭМ' not in df.columns:
+            return {
+                'status': 'error',
+                'message': "Файл должен содержать колонки 'логин эм' и 'ЭМ'"
+            }
+        
+        df = df[['логин эм', 'ЭМ']].copy()
+        df = df.dropna(subset=['логин эм', 'ЭМ'])
+        
+        # Проверка на дубликаты по логин эм
+        duplicates = df[df.duplicated(subset=['логин эм'], keep=False)]
+        
+        return {
+            'status': 'success',
+            'data': df,
+            'invalid': duplicates if not duplicates.empty else None,
             'last_upload': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         
