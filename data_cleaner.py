@@ -1,6 +1,6 @@
 # ==================== data_cleaner.py ====================
 """
-Логика очистки данных
+Логика очистки данных и заполнения колонок
 """
 
 import pandas as pd
@@ -203,3 +203,60 @@ def clean_data(df):
         deleted_df = pd.DataFrame(columns=all_columns_renamed)
     
     return cleaned_df, deleted_df
+
+
+def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
+    """
+    Заполняет колонки Логин RS и ЭМ
+    
+    Args:
+        cleaned_df: очищенный массив (DataFrame)
+        projects_df: справочник "Проекты вне чеккера" (DataFrame)
+        name_login_df: справочник "Имя-логин" (DataFrame)
+    
+    Returns:
+        DataFrame с заполненными колонками
+    """
+    df = cleaned_df.copy()
+    
+    # ============ ШАГ 1: Заполнение Логин RS ============
+    if projects_df is not None and not projects_df.empty:
+        # Создаем словарь для быстрого поиска
+        # Ключ: (номер локации, Код проекта) → Значение: логин ЭМ кто назначил
+        project_dict = {}
+        for _, row in projects_df.iterrows():
+            key = (str(row['номер локации']).strip(), str(row['Код проекта']).strip())
+            project_dict[key] = str(row['логин ЭМ кто назначил']).strip()
+        
+        # Заполняем Логин RS
+        def get_login_rs(row):
+            key = (str(row['BranchID']).strip(), str(row['SetCode']).strip())
+            return project_dict.get(key, row['Логин RS'])
+        
+        df['Логин RS'] = df.apply(get_login_rs, axis=1)
+    
+    # ============ ШАГ 2: Дозаполнение ЭМ ============
+    if name_login_df is not None and not name_login_df.empty:
+        # Создаем словарь: логин эм → ЭМ
+        name_dict = {}
+        for _, row in name_login_df.iterrows():
+            login = str(row['логин эм']).strip()
+            name = str(row['ЭМ']).strip()
+            name_dict[login] = name
+        
+        # Проверяем, нужно ли заполнять ЭМ
+        def get_em(row):
+            em_value = str(row['ЭМ']).strip()
+            login_rs = str(row['Логин RS']).strip()
+            
+            # Проверяем, что ЭМ пустая или содержит - / 0 / koordinator
+            if em_value == '' or em_value == '-' or em_value == '0' or 'koordinator' in em_value.lower():
+                # Ищем в словаре по логин rs
+                if login_rs in name_dict:
+                    return name_dict[login_rs]
+            
+            return row['ЭМ']
+        
+        df['ЭМ'] = df.apply(get_em, axis=1)
+    
+    return df
