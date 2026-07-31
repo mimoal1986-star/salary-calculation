@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 
 from data_loader import load_excel, validate_columns
-from data_cleaner import clean_data
+from data_cleaner import clean_data, fill_rs_and_em
 from report_generator import create_cleaned_excel, create_deleted_excel, get_filename
 from settings_loader import (
     load_region_type,
@@ -47,6 +47,14 @@ if 'projects_outside_checker_df' not in st.session_state:
     st.session_state.projects_outside_checker_df = None
 if 'hvosty_df' not in st.session_state:
     st.session_state.hvosty_df = None
+if 'name_login_df' not in st.session_state:
+    st.session_state.name_login_df = None
+
+# ==================== ЗАГРУЗКА СПРАВОЧНИКОВ ИЗ GITHUB ====================
+# Загружаем справочник "Имя-логин" из GitHub при старте
+name_login_data = load_from_json_github('name_login')
+if name_login_data is not None:
+    st.session_state.name_login_df = pd.DataFrame(name_login_data['data'])
 
 # ==================== СОЗДАНИЕ ВКЛАДОК ====================
 tab1, tab2 = st.tabs(["📊 Основная", "⚙️ Настройки"])
@@ -160,7 +168,16 @@ with tab1:
         if st.button("🚀 Запустить расчет", type="primary", use_container_width=True):
             with st.spinner("Выполняется расчет..."):
                 try:
+                    # Шаг 1: Очистка данных
                     cleaned_df, deleted_df = clean_data(df)
+                    
+                    # Шаг 2: Заполнение Логин RS и ЭМ
+                    if st.session_state.projects_outside_checker_df is not None:
+                        cleaned_df = fill_rs_and_em(
+                            cleaned_df,
+                            st.session_state.projects_outside_checker_df,
+                            st.session_state.name_login_df
+                        )
                     
                     st.session_state.cleaned_excel = create_cleaned_excel(cleaned_df)
                     if not deleted_df.empty:
@@ -349,11 +366,14 @@ with tab2:
             else:
                 st.success(f"✅ Загружено {len(result['data'])} записей")
                 
+                if result.get('removed_duplicates', 0) > 0:
+                    st.warning(f"⚠️ Удалено полных дубликатов: {result['removed_duplicates']}")
+                
                 if result.get('invalid') is not None and not result['invalid'].empty:
-                    st.warning("⚠️ Обнаружены дубликаты по колонке 'логин эм':")
-                    st.dataframe(result['invalid'], use_container_width=True)
+                    with st.expander("🔍 Показать удаленные дубликаты"):
+                        st.dataframe(result['invalid'], use_container_width=True)
                 else:
-                    st.info("✅ Все значения корректны")
+                    st.info("✅ Полных дубликатов не обнаружено")
                 
                 st.dataframe(result['data'], use_container_width=True)
                 
