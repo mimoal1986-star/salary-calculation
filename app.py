@@ -10,7 +10,8 @@ from data_cleaner import (
     fill_region_type,
     fill_separate_motivation,
     fill_quota,
-    fill_closing_coefficient_rate_salary  # ← НОВАЯ ФУНКЦИЯ
+    fill_closing_coefficient_rate_salary,
+    fill_recruit_adjustments  # ← НОВАЯ ФУНКЦИЯ
 )
 from report_generator import create_cleaned_excel, create_deleted_excel, get_filename
 from settings_loader import (
@@ -211,6 +212,9 @@ with tab1:
 
                     # Шаг 7: Заполнение закрытие, коэффициент, ставка, зп эм, надбавка за квоту, надбавка на анкету
                     cleaned_df = fill_closing_coefficient_rate_salary(cleaned_df, st.session_state.hvosty_df)
+                    
+                    # Шаг 8: Заполнение рекрут, рекрут на анкету, корректировка, корректировка на анкету, корректировка холостых, Итого затраты на эм
+                    cleaned_df = fill_recruit_adjustments(cleaned_df, st.session_state.zp_shtrafy_df)
 
                     st.session_state.cleaned_excel = create_cleaned_excel(cleaned_df)
                     if not deleted_df.empty:
