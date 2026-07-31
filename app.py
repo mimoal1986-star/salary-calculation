@@ -210,6 +210,7 @@ with tab1:
                 except Exception as e:
                     st.error(f"❌ Ошибка: {str(e)}")
 
+
 # ==================== ВКЛАДКА 2: НАСТРОЙКИ ====================
 with tab2:
     st.markdown("---")
@@ -228,7 +229,6 @@ with tab2:
         )
     
     with col2:
-        # Проверяем наличие загруженного файла
         region_data = load_from_json('region_type')
         if region_data is not None:
             st.caption(f"📅 Последняя загрузка: {region_data.get('last_upload', 'неизвестно')}")
@@ -240,15 +240,8 @@ with tab2:
             if result['status'] == 'error':
                 st.error(f"❌ {result['message']}")
             else:
-                # Сохраняем в JSON
-                save_to_json('region_type', {
-                    'data': result['data'].to_dict('records'),
-                    'last_upload': result['last_upload']
-                })
-                
                 st.success(f"✅ Загружено {len(result['data'])} записей")
                 
-                # Проверка на некорректные значения
                 if result.get('invalid') is not None and not result['invalid'].empty:
                     st.warning("⚠️ Обнаружены некорректные значения:")
                     st.dataframe(result['invalid'], use_container_width=True)
@@ -256,6 +249,15 @@ with tab2:
                     st.info("✅ Все значения корректны")
                 
                 st.dataframe(result['data'], use_container_width=True)
+                
+                # Кнопка "Сохранить"
+                if st.button("💾 Сохранить Регион-Тип", key="save_region"):
+                    save_to_json('region_type', {
+                        'data': result['data'].to_dict('records'),
+                        'last_upload': result['last_upload']
+                    })
+                    st.success("✅ Справочник 'Регион-Тип' сохранен!")
+                    st.rerun()
     
     st.markdown("---")
     
@@ -283,11 +285,6 @@ with tab2:
             if result['status'] == 'error':
                 st.error(f"❌ {result['message']}")
             else:
-                save_to_json('project_motivation', {
-                    'data': result['data'].to_dict('records'),
-                    'last_upload': result['last_upload']
-                })
-                
                 st.success(f"✅ Загружено {len(result['data'])} записей")
                 
                 if result.get('invalid') is not None and not result['invalid'].empty:
@@ -297,3 +294,12 @@ with tab2:
                     st.info("✅ Все значения корректны")
                 
                 st.dataframe(result['data'], use_container_width=True)
+                
+                # Кнопка "Сохранить"
+                if st.button("💾 Сохранить Проект-Мотивация", key="save_project"):
+                    save_to_json('project_motivation', {
+                        'data': result['data'].to_dict('records'),
+                        'last_upload': result['last_upload']
+                    })
+                    st.success("✅ Справочник 'Проект-Мотивация' сохранен!")
+                    st.rerun()
