@@ -1,429 +1,399 @@
-# ==================== app.py ====================
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 
-from data_loader import load_excel, validate_columns
-from data_cleaner import (
-    clean_data,
-    fill_rs_and_em,
-    fill_project_motivation,
-    fill_region_type,
-    fill_separate_motivation,
-    fill_quota,
-    fill_closing_coefficient_rate_salary,
-    fill_recruit_adjustments  # ← НОВАЯ ФУНКЦИЯ
-)
-from report_generator import create_cleaned_excel, create_deleted_excel, get_filename
-from settings_loader import (
-    load_region_type,
-    load_project_motivation,
-    load_name_login,
-    save_to_json_github,
-    load_from_json_github
-)
+from parsers import IPParser, ParserError
+from calculators import BalanceCalculator
+from data_validators import DataValidator
+from helpers import create_excel_report, export_deposit_report_to_excel
+from deposit_report import DepositReportGenerator
 
-# ==================== НАСТРОЙКА СТРАНИЦЫ ====================
+# Настройка страницы
 st.set_page_config(
-    page_title="Расчет ЗП",
+    page_title="Отчет по ДДС ИП",
     page_icon="💰",
     layout="wide"
 )
 
-st.title("💰 Расчет ЗП")
+st.title("💰 Автоматический отчет по движению денежных средств ИП")
 
-# ==================== ИНИЦИАЛИЗАЦИЯ СЕССИИ ====================
-if 'cleaned_excel' not in st.session_state:
-    st.session_state.cleaned_excel = None
-if 'deleted_excel' not in st.session_state:
-    st.session_state.deleted_excel = None
-if 'is_cleaned' not in st.session_state:
-    st.session_state.is_cleaned = False
-if 'original_df' not in st.session_state:
-    st.session_state.original_df = None
-if 'total_rows' not in st.session_state:
-    st.session_state.total_rows = 0
-if 'cleaned_rows' not in st.session_state:
-    st.session_state.cleaned_rows = 0
-if 'deleted_rows' not in st.session_state:
-    st.session_state.deleted_rows = 0
-if 'columns_valid' not in st.session_state:
-    st.session_state.columns_valid = False
+# Инициализация сессии
+if "ip_operations" not in st.session_state:
+    st.session_state.ip_operations = None
+if "data_loaded" not in st.session_state:
+    st.session_state.data_loaded = False
+if "report_ready" not in st.session_state:
+    st.session_state.report_ready = False
+if "ip_report" not in st.session_state:
+    st.session_state.ip_report = None
+if "excel_data" not in st.session_state:
+    st.session_state.excel_data = None
+if "report_filename" not in st.session_state:
+    st.session_state.report_filename = None
 
-# Для дополнительных справочников
-if 'zp_shtrafy_df' not in st.session_state:
-    st.session_state.zp_shtrafy_df = None
-if 'projects_outside_checker_df' not in st.session_state:
-    st.session_state.projects_outside_checker_df = None
-if 'hvosty_df' not in st.session_state:
-    st.session_state.hvosty_df = None
-if 'name_login_df' not in st.session_state:
-    st.session_state.name_login_df = None
+# -------------------------------
+# Блок загрузки файлов
+# -------------------------------
+st.header("📁 Загрузка выписок банков")
 
-# ==================== ЗАГРУЗКА СПРАВОЧНИКОВ ИЗ GITHUB ====================
-# Загружаем справочник "Имя-логин" из GitHub при старте
-name_login_data = load_from_json_github('name_login')
-if name_login_data is not None:
-    st.session_state.name_login_df = pd.DataFrame(name_login_data['data'])
+file_ip = st.file_uploader(
+    "📂 Загрузите Excel-файл выписки ИП",
+    type=["xlsx", "xls"],
+    key="ip_upload"
+)
 
-# ==================== СОЗДАНИЕ ВКЛАДОК ====================
-tab1, tab2 = st.tabs(["📊 Основная", "⚙️ Настройки"])
-
-# ==================== ВКЛАДКА 1: ОСНОВНАЯ ====================
-with tab1:
-    st.markdown("---")
-    
-    # Загрузка файла
-    uploaded_file = st.file_uploader(
-        "📁 Загрузите Excel-файл 'Массив итоги месяца'",
-        type=['xlsx', 'xls'],
-        key="main_file"
-    )
-    
-    if uploaded_file is not None:
-        # Загружаем файл (только один раз)
-        if st.session_state.original_df is None:
-            with st.spinner("Загрузка файла..."):
-                df, error = load_excel(uploaded_file)
-                if error:
-                    st.error(f"❌ {error}")
-                    st.stop()
+# Кнопка обработки
+if st.button("🔄 Обработать файл", type="primary"):
+    if file_ip:
+        try:
+            with st.spinner("Обработка файла..."):
+                st.session_state.ip_operations = IPParser.parse(file_ip)
                 
-                is_valid, error_msg, _ = validate_columns(df)
-                if not is_valid:
-                    st.error(f"❌ {error_msg}")
-                    st.session_state.columns_valid = False
-                    st.stop()
-                else:
-                    st.session_state.columns_valid = True
+                if not st.session_state.ip_operations.empty:
+                    duplicates_ip = DataValidator.find_duplicates(st.session_state.ip_operations)
+                    if not duplicates_ip.empty:
+                        st.warning(f"⚠️ Обнаружены дублирующиеся операции: {len(duplicates_ip)} шт.")
+                        with st.expander("📋 Показать дубликаты"):
+                            st.dataframe(
+                                duplicates_ip[["date", "amount", "description"]],
+                                use_container_width=True,
+                                hide_index=True
+                            )
+                    
+                    DataValidator.validate_amounts(st.session_state.ip_operations)
                 
-                st.session_state.original_df = df
-                st.session_state.total_rows = len(df)
-                st.session_state.is_cleaned = False
-        
-        df = st.session_state.original_df
-        
-        # Статистика
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("📊 Всего строк", st.session_state.total_rows)
-        with col2:
-            status = "✅ Присутствуют" if st.session_state.columns_valid else "❌ Отсутствуют"
-            st.metric("📋 Все колонки", status)
-        with col3:
-            deleted = st.session_state.deleted_rows if st.session_state.is_cleaned else 0
-            st.metric("🗑️ Удалено строк", deleted)
-        
-        st.markdown("---")
-        
-        # ==================== ДОПОЛНИТЕЛЬНЫЕ ЗАГРУЗЧИКИ ====================
-        st.subheader("📁 Дополнительные справочники")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.caption("ЗП_штрафы")
-            zp_file = st.file_uploader(
-                "Загрузите файл",
-                type=['xlsx', 'xls'],
-                key="zp_shtrafy",
-                label_visibility="collapsed"
-            )
-            if zp_file is not None:
-                with st.spinner("Загрузка ЗП_штрафы..."):
-                    try:
-                        df_shtrafy = pd.read_excel(zp_file, engine='openpyxl')
-                        st.session_state.zp_shtrafy_df = df_shtrafy
-                        st.toast(f"✅ Загружено {len(df_shtrafy)} записей", icon="✅")
-                    except Exception as e:
-                        st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
-        
-        with col2:
-            st.caption("Проекты вне чеккера")
-            projects_file = st.file_uploader(
-                "Загрузите файл",
-                type=['xlsx', 'xls'],
-                key="projects_outside_checker",
-                label_visibility="collapsed"
-            )
-            if projects_file is not None:
-                with st.spinner("Загрузка Проекты вне чеккера..."):
-                    try:
-                        df_projects = pd.read_excel(projects_file, engine='openpyxl')
-                        st.session_state.projects_outside_checker_df = df_projects
-                        st.toast(f"✅ Загружено {len(df_projects)} записей", icon="✅")
-                    except Exception as e:
-                        st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
-        
-        with col3:
-            st.caption("Хвосты")
-            hvosty_file = st.file_uploader(
-                "Загрузите файл",
-                type=['xlsx', 'xls'],
-                key="hvosty",
-                label_visibility="collapsed"
-            )
-            if hvosty_file is not None:
-                with st.spinner("Загрузка Хвосты..."):
-                    try:
-                        df_hvosty = pd.read_excel(hvosty_file, engine='openpyxl')
-                        st.session_state.hvosty_df = df_hvosty
-                        st.toast(f"✅ Загружено {len(df_hvosty)} записей", icon="✅")
-                    except Exception as e:
-                        st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
-        
-        st.markdown("---")
-        
-        # ==================== КНОПКА ЗАПУСКА ====================
-        if st.button("🚀 Запустить расчет", type="primary", use_container_width=True):
-            with st.spinner("Выполняется расчет..."):
-                try:
-                    # Шаг 1: Очистка данных
-                    cleaned_df, deleted_df = clean_data(df)
-                    
-                    # Шаг 2: Заполнение Логин RS и RS (бывшая ЭМ)
-                    if st.session_state.projects_outside_checker_df is not None:
-                        cleaned_df = fill_rs_and_em(
-                            cleaned_df,
-                            st.session_state.projects_outside_checker_df,
-                            st.session_state.name_login_df
-                        )
-                    
-                    # Шаг 3: Заполнение Проектная мотивация
-                    project_motivation_data = load_from_json_github('project_motivation')
-                    if project_motivation_data is not None:
-                        project_motivation_df = pd.DataFrame(project_motivation_data['data'])
-                        cleaned_df, invalid_projects = fill_project_motivation(cleaned_df, project_motivation_df)
-                        if invalid_projects:
-                            st.warning(f"⚠️ Проекты с мотивацией ≠ 1: {', '.join(invalid_projects)}")
-                    
-                    # Шаг 4: Заполнение Тип квоты (Регион-Тип)
-                    region_type_data = load_from_json_github('region_type')
-                    if region_type_data is not None:
-                        region_type_df = pd.DataFrame(region_type_data['data'])
-                        cleaned_df, invalid_regions = fill_region_type(cleaned_df, region_type_df)
-                        if invalid_regions:
-                            st.warning(f"⚠️ Регионы не найдены в справочнике: {', '.join(invalid_regions)}")
-                    
-                    # Шаг 5: Заполнение отдельная мотивация = ЧТО-ТО - ВСЕГО
-                    cleaned_df = fill_separate_motivation(cleaned_df)
-                    
-                    # Шаг 6: Заполнение квота = количество записей по Логин RS
-                    cleaned_df = fill_quota(cleaned_df)
-
-                    # Шаг 7: Заполнение закрытие, коэффициент, ставка, зп эм, надбавка за квоту, надбавка на анкету
-                    cleaned_df = fill_closing_coefficient_rate_salary(cleaned_df, st.session_state.hvosty_df)
-                    
-                    # Шаг 8: Заполнение рекрут, рекрут на анкету, корректировка, корректировка на анкету, корректировка холостых, Итого затраты на эм
-                    cleaned_df = fill_recruit_adjustments(cleaned_df, st.session_state.zp_shtrafy_df)
-                    
-                    # Шаг 9: Округление всех дробных чисел до 2 знаков
-                    cleaned_df = cleaned_df.round(2)
-
-                    st.session_state.cleaned_excel = create_cleaned_excel(cleaned_df)
-                    if not deleted_df.empty:
-                        st.session_state.deleted_excel = create_deleted_excel(deleted_df)
-                    else:
-                        st.session_state.deleted_excel = None
-                    
-                    st.session_state.is_cleaned = True
-                    st.session_state.cleaned_rows = len(cleaned_df)
-                    st.session_state.deleted_rows = len(deleted_df)
-                    
-                    st.toast("✅ Расчет завершен!", icon="✅")
-                    
-                except Exception as e:
-                    st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
-                    st.exception(e)
-            
-        
-        # ==================== СКАЧИВАНИЕ ====================
-        if st.session_state.is_cleaned:
-            st.markdown("---")
-            st.subheader("📥 Скачать результаты")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.session_state.cleaned_excel is not None:
-                    st.download_button(
-                        label="📥 Скачать очищенный файл",
-                        data=st.session_state.cleaned_excel,
-                        file_name=get_filename("Массив_итоги_месяца", "очищенный"),
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True,
-                        key="download_cleaned"
-                    )
-            
-            with col2:
-                if st.session_state.deleted_excel is not None:
-                    st.download_button(
-                        label="📥 Скачать удаленные строки",
-                        data=st.session_state.deleted_excel,
-                        file_name=get_filename("Массив_итоги_месяца", "удаленный"),
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True,
-                        key="download_deleted"
-                    )
-                else:
-                    st.info("📭 Нет удаленных строк")
-            
-            st.markdown("---")
-            st.caption("🔄 Чтобы обработать другой файл, загрузите его заново")
-    
+                st.session_state.data_loaded = True
+                st.session_state.report_ready = False
+                
+                st.success("✅ Файл успешно обработан и проверен!")
+                
+                count_ip = len(st.session_state.ip_operations) if not st.session_state.ip_operations.empty else 0
+                st.metric("📊 Операций в выписке", count_ip)
+                
+        except ParserError as e:
+            st.error(f"❌ Ошибка при обработке: {str(e)}")
+            st.session_state.data_loaded = False
+        except ValueError as e:
+            st.error(f"❌ Ошибка валидации: {str(e)}")
+            st.session_state.data_loaded = False
+        except Exception as e:
+            st.error(f"❌ Непредвиденная ошибка: {str(e)}")
+            st.session_state.data_loaded = False
     else:
-        st.info("👆 Загрузите Excel-файл для начала работы")
-    
-    st.markdown("---")
+        st.warning("⚠️ Загрузите файл для обработки")
 
-# ==================== ВКЛАДКА 2: НАСТРОЙКИ ====================
-with tab2:
-    st.markdown("---")
-    st.subheader("⚙️ Настройки справочников")
+# -------------------------------
+# Основной функционал
+# -------------------------------
+if st.session_state.data_loaded and st.session_state.ip_operations is not None:
     
-    # ==================== 2.1 РЕГИОН-ТИП ====================
-    st.markdown("#### 📁 Регион-Тип")
+    if st.session_state.ip_operations.empty:
+        st.warning("⚠️ Нет данных для формирования отчета")
+        st.stop()
     
-    col1, col2 = st.columns([2, 1])
+    try:
+        all_dates = st.session_state.ip_operations["date"].tolist()
+        if all_dates:
+            min_date = min(all_dates)
+            max_date = max(all_dates)
+        else:
+            st.warning("⚠️ Нет данных с датами")
+            st.stop()
+    except Exception as e:
+        st.error(f"❌ Ошибка определения диапазона дат: {str(e)}")
+        st.stop()
     
+    st.subheader("📅 Настройка периода отчета")
+    
+    col1, col2 = st.columns(2)
     with col1:
-        region_file = st.file_uploader(
-            "Загрузите Excel-файл 'Регион-Тип'",
-            type=['xlsx', 'xls'],
-            key="region_type"
+        start_date = st.date_input(
+            "📆 Дата начала периода",
+            value=min_date,
+            min_value=min_date,
+            max_value=max_date,
+            key="start_date"
+        )
+    with col2:
+        end_date = st.date_input(
+            "📆 Дата окончания периода",
+            value=max_date,
+            min_value=min_date,
+            max_value=max_date,
+            key="end_date"
         )
     
-    with col2:
+    # ============================================
+    # КНОПКА РАСЧЕТА
+    # ============================================
+    if st.button("📊 Сформировать отчет", type="primary"):
         try:
-            region_data = load_from_json_github('region_type')
-            if region_data is not None:
-                st.caption(f"📅 Последняя загрузка: {region_data.get('last_upload', 'неизвестно')}")
-        except Exception as e:
-            st.caption("⚠️ Не удалось загрузить из GitHub")
-    
-    if region_file is not None:
-        with st.spinner("Загрузка справочника..."):
-            result = load_region_type(region_file)
+            DataValidator.validate_dates(start_date, end_date)
             
-            if result['status'] == 'error':
-                st.error(f"❌ {result['message']}")
-            else:
-                st.success(f"✅ Загружено {len(result['data'])} записей")
+            with st.spinner("Расчет отчета..."):
+                reports = BalanceCalculator.calculate(
+                    st.session_state.ip_operations,
+                    pd.Timestamp(start_date),
+                    pd.Timestamp(end_date)
+                )
                 
-                if result.get('invalid') is not None and not result['invalid'].empty:
-                    st.warning("⚠️ Обнаружены некорректные значения:")
-                    st.dataframe(result['invalid'], use_container_width=True)
-                else:
-                    st.info("✅ Все значения корректны")
+                st.session_state.ip_report = reports["ip"]
                 
-                st.dataframe(result['data'], use_container_width=True)
+                excel_file = create_excel_report(
+                    st.session_state.ip_report,
+                    st.session_state.ip_operations
+                )
                 
-                if st.button("💾 Сохранить в GitHub", key="save_region_github"):
-                    try:
-                        save_to_json_github('region_type', {
-                            'data': result['data'].to_dict('records'),
-                            'last_upload': result['last_upload']
-                        })
-                        st.toast("✅ Справочник 'Регион-Тип' сохранен в GitHub!", icon="✅")
-                    except Exception as e:
-                        st.toast(f"❌ Ошибка сохранения в GitHub: {str(e)}", icon="❌")
-    
-    st.markdown("---")
-    
-    # ==================== 2.2 ПРОЕКТ-МОТИВАЦИЯ ====================
-    st.markdown("#### 📁 Проект-Мотивация")
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        project_file = st.file_uploader(
-            "Загрузите Excel-файл 'Проект-Мотивация'",
-            type=['xlsx', 'xls'],
-            key="project_motivation"
-        )
-    
-    with col2:
-        try:
-            project_data = load_from_json_github('project_motivation')
-            if project_data is not None:
-                st.caption(f"📅 Последняя загрузка: {project_data.get('last_upload', 'неизвестно')}")
+                st.session_state.excel_data = excel_file.getvalue()
+                st.session_state.report_filename = f"Отчет_ДДС_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.xlsx"
+                st.session_state.report_ready = True
+                
+                st.success("✅ Отчет сформирован!")
+                
+        except ValueError as e:
+            st.error(f"❌ Ошибка валидации: {str(e)}")
         except Exception as e:
-            st.caption("⚠️ Не удалось загрузить из GitHub")
+            st.error(f"❌ Ошибка при формировании отчета: {str(e)}")
     
-    if project_file is not None:
-        with st.spinner("Загрузка справочника..."):
-            result = load_project_motivation(project_file)
-            
-            if result['status'] == 'error':
-                st.error(f"❌ {result['message']}")
+    # ============================================
+    # ОТОБРАЖЕНИЕ РЕЗУЛЬТАТОВ
+    # ============================================
+    if st.session_state.report_ready and st.session_state.ip_report is not None:
+        ip_report = st.session_state.ip_report
+        
+        st.header("📈 Отчет по движению денежных средств")
+        
+        # ============================================
+        # РАСЧЕТ "Из них на депозите" на конец периода
+        # ============================================
+        
+        deposit_ops_all = st.session_state.ip_operations.attrs.get("deposits", pd.DataFrame()) if st.session_state.ip_operations is not None else pd.DataFrame()
+        
+        if not deposit_ops_all.empty:
+            deposit_report_full = DepositReportGenerator.generate_report(deposit_ops_all)
+            if not deposit_report_full.empty:
+                end_ts = pd.Timestamp(end_date)
+                
+                active_on_end = deposit_report_full[
+                    (deposit_report_full["Дата начала"] <= end_ts) &
+                    (
+                        (deposit_report_full["Дата завершения"].isna()) |
+                        (deposit_report_full["Дата завершения"] > end_ts)
+                    )
+                ]
+                
+                ip_on_deposit = active_on_end["Сумма депозита (руб)"].sum() if not active_on_end.empty else 0.0
             else:
-                st.success(f"✅ Загружено {len(result['data'])} записей")
-                
-                if result.get('invalid') is not None and not result['invalid'].empty:
-                    st.warning("⚠️ Обнаружены некорректные значения:")
-                    st.dataframe(result['invalid'], use_container_width=True)
-                else:
-                    st.info("✅ Все значения корректны")
-                
-                st.dataframe(result['data'], use_container_width=True)
-                
-                if st.button("💾 Сохранить в GitHub", key="save_project_github"):
-                    try:
-                        save_to_json_github('project_motivation', {
-                            'data': result['data'].to_dict('records'),
-                            'last_upload': result['last_upload']
-                        })
-                        st.toast("✅ Справочник 'Проект-Мотивация' сохранен в GitHub!", icon="✅")
-                    except Exception as e:
-                        st.toast(f"❌ Ошибка сохранения в GitHub: {str(e)}", icon="❌")
-    
-    st.markdown("---")
-    
-    # ==================== 2.3 ИМЯ-ЛОГИН ====================
-    st.markdown("#### 📁 Имя-логин")
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        name_login_file = st.file_uploader(
-            "Загрузите Excel-файл 'Имя-логин'",
-            type=['xlsx', 'xls'],
-            key="name_login"
-        )
-    
-    with col2:
-        try:
-            name_login_data = load_from_json_github('name_login')
-            if name_login_data is not None:
-                st.caption(f"📅 Последняя загрузка: {name_login_data.get('last_upload', 'неизвестно')}")
-        except Exception as e:
-            st.caption("⚠️ Не удалось загрузить из GitHub")
-    
-    if name_login_file is not None:
-        with st.spinner("Загрузка справочника..."):
-            result = load_name_login(name_login_file)
+                ip_on_deposit = 0.0
+        else:
+            ip_on_deposit = 0.0
+        
+        # ============================================
+        # ОТОБРАЖЕНИЕ МЕТРИК (3 колонки)
+        # ============================================
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric(
+                "🏢 Начальный остаток ИП",
+                f"{ip_report.start_balance / 1_000_000:.2f} млн ₽"
+            )
+        
+        with col2:
+            st.metric(
+                "🏢 Конечный остаток ИП",
+                f"{ip_report.end_balance / 1_000_000:.2f} млн ₽",
+                delta=f"{(ip_report.end_balance - ip_report.start_balance) / 1_000_000:+.2f} млн ₽"
+            )
+        
+        with col3:
+            st.metric(
+                "🏦 Из них на депозите",
+                f"{ip_on_deposit / 1_000_000:.2f} млн ₽"
+            )
+        
+        # ============================================
+        # ВКЛАДКИ
+        # ============================================
+        tab1, tab2 = st.tabs(["📊 Динамика ИП", "🏦 Депозиты"])
+        
+        # --- Вкладка 1: Динамика ИП ---
+        with tab1:
+            st.subheader("Динамика остатка ИП помесячно")
             
-            if result['status'] == 'error':
-                st.error(f"❌ {result['message']}")
-            else:
-                st.success(f"✅ Загружено {len(result['data'])} записей")
+            if not ip_report.monthly_dynamics.empty:
+                df_dynamics = ip_report.monthly_dynamics.copy()
                 
-                if result.get('removed_duplicates', 0) > 0:
-                    st.warning(f"⚠️ Удалено полных дубликатов: {result['removed_duplicates']}")
+                df_dynamics["month_short"] = pd.to_datetime(
+                    df_dynamics["month"], format="%B %Y"
+                ).dt.strftime("%b'%y")
                 
-                if result.get('invalid') is not None and not result['invalid'].empty:
-                    with st.expander("🔍 Показать удаленные дубликаты"):
-                        st.dataframe(result['invalid'], use_container_width=True)
+                start_balance = df_dynamics["balance"].iloc[0] if not df_dynamics.empty else 0
+                df_dynamics["dynamics"] = df_dynamics["balance"].diff().fillna(0)
+                
+                ip_ops = st.session_state.ip_operations
+                
+                if not ip_ops.empty:
+                    ops = ip_ops.copy()
+                    ops["month_period"] = ops["date"].dt.to_period("M").dt.strftime("%b'%y")
+                    
+                    monthly_income = ops[ops["amount"] > 0].groupby("month_period")["amount"].sum()
+                    monthly_expense = ops[ops["amount"] < 0].groupby("month_period")["amount"].sum()
+                    
+                    months = df_dynamics["month_short"].tolist()
+                    
+                    table_data = {
+                        "Показатель": [
+                            "Начальный остаток, млн ₽",
+                            "Конечный остаток, млн ₽",
+                            "Динамика, млн ₽",
+                            "Поступления, млн ₽",
+                            "Списания, млн ₽"
+                        ]
+                    }
+                    
+                    for month in months:
+                        row = df_dynamics[df_dynamics["month_short"] == month]
+                        
+                        if not row.empty:
+                            balance = row["balance"].iloc[0] / 1_000_000
+                            dynamics = row["dynamics"].iloc[0] / 1_000_000
+                            
+                            income = monthly_income.get(month, 0) / 1_000_000
+                            expense = monthly_expense.get(month, 0) / 1_000_000
+                        else:
+                            balance = 0
+                            dynamics = 0
+                            income = 0
+                            expense = 0
+                        
+                        if month == months[0]:
+                            start_bal = start_balance / 1_000_000
+                        else:
+                            prev_idx = df_dynamics[df_dynamics["month_short"] == month].index
+                            if len(prev_idx) > 0:
+                                idx = prev_idx[0]
+                                if idx > 0:
+                                    start_bal = df_dynamics.iloc[idx - 1]["balance"] / 1_000_000
+                                else:
+                                    start_bal = start_balance / 1_000_000
+                            else:
+                                start_bal = 0
+                        
+                        table_data[month] = [
+                            f"{start_bal:.2f}",
+                            f"{balance:.2f}",
+                            f"{dynamics:+.2f}",
+                            f"{income:+.2f}",
+                            f"{expense:+.2f}"
+                        ]
+                    
+                    df_table = pd.DataFrame(table_data)
+                    
+                    styled_df = df_table.style.hide(axis="index").set_properties(
+                        **{'border-bottom': '2px solid #cccccc'}, 
+                        subset=pd.IndexSlice[2, :]
+                    )
+                    
+                    st.dataframe(
+                        styled_df,
+                        use_container_width=True
+                    )
                 else:
-                    st.info("✅ Полных дубликатов не обнаружено")
+                    st.info("Нет данных для отображения динамики ИП")
+            else:
+                st.info("Нет данных для отображения динамики ИП")
+        
+        # --- Вкладка 2: Депозиты ---
+        with tab2:
+            st.header("🏦 Отчет по депозитам")
+            
+            if st.session_state.ip_operations is not None and not st.session_state.ip_operations.empty:
+                deposit_ops_all = st.session_state.ip_operations.attrs.get("deposits", pd.DataFrame())
                 
-                st.dataframe(result['data'], use_container_width=True)
-                
-                if st.button("💾 Сохранить в GitHub", key="save_name_login"):
-                    try:
-                        save_to_json_github('name_login', {
-                            'data': result['data'].to_dict('records'),
-                            'last_upload': result['last_upload']
-                        })
-                        st.toast("✅ Справочник 'Имя-логин' сохранен в GitHub!", icon="✅")
-                    except Exception as e:
-                        st.toast(f"❌ Ошибка сохранения в GitHub: {str(e)}", icon="❌")
+                if deposit_ops_all.empty:
+                    st.info("ℹ️ Нет депозитных операций в выписке ИП")
+                else:
+                    deposit_report_full = DepositReportGenerator.generate_report(deposit_ops_all)
+                    
+                    if deposit_report_full.empty:
+                        st.info("ℹ️ Не найдены депозитные операции с номерами сделок")
+                    else:
+                        start_ts = pd.Timestamp(start_date)
+                        end_ts = pd.Timestamp(end_date)
+                        
+                        deposit_report = deposit_report_full[
+                            (deposit_report_full["Дата начала"] >= start_ts) & 
+                            (deposit_report_full["Дата начала"] <= end_ts)
+                        ].copy()
+                        
+                        if deposit_report.empty:
+                            st.info(f"ℹ️ Нет депозитов, начавшихся в период {start_date.strftime('%d.%m.%Y')} - {end_date.strftime('%d.%m.%Y')}")
+                        else:
+                            active_deposits = deposit_report[deposit_report["Дата завершения"].isna()]
+                            active_count = len(active_deposits)
+                            active_amount = active_deposits["Сумма депозита (руб)"].sum() if not active_deposits.empty else 0.0
+                            
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.metric("📌 Кол-во депозитов активно (шт)", active_count)
+                            with col2:
+                                st.metric("💰 Общая сумма рублей на активных депозитах (руб)", f"{active_amount:,.2f} ₽")
+                            
+                            st.dataframe(
+                                deposit_report,
+                                use_container_width=True,
+                                hide_index=True
+                            )
+                            
+                            excel_file = export_deposit_report_to_excel(deposit_report, st.session_state.ip_operations)
+                            st.download_button(
+                                label="📥 Скачать депозитный отчет Excel",
+                                data=excel_file,
+                                file_name=f"Депозитный_отчет_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key="download_deposits"
+                            )
+            else:
+                st.info("ℹ️ Нет данных ИП для формирования депозитного отчета")
+        
+        # ============================================
+        # КНОПКА СКАЧИВАНИЯ ОСНОВНОГО ОТЧЕТА
+        # ============================================
+        if st.session_state.excel_data is not None:
+            st.download_button(
+                label="📥 Скачать отчет Excel",
+                data=st.session_state.excel_data,
+                file_name=st.session_state.report_filename,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                type="primary",
+                key="download_excel"
+            )
+
+else:
+    if not st.session_state.data_loaded:
+        st.info("👆 Загрузите файл и нажмите 'Обработать файл'")
+    else:
+        st.warning("⚠️ Данные не загружены. Попробуйте перезагрузить файл.")
+
+# -------------------------------
+# Информация о проекте
+# -------------------------------
+with st.expander("ℹ️ Информация о проекте"):
+    st.markdown("""
+    ### Как работает сервис:
+    1. Загрузите Excel-файл выписки ИП
+    2. Нажмите "Обработать файл" - данные будут проверены
+    3. Выберите период отчета
+    4. Нажмите "Сформировать отчет"
+    5. Скачайте готовый отчет в Excel
+    
+    ### Формат файла:
+    **Выписка ИП:** колонки Дата, Дебет, Кредит, Назначение платежа
+    
+    ### Важные замечания:
+    - Все суммы отображаются в млн ₽
+    - Автоматическая проверка дубликатов и корректности данных
+    - Депозитные операции (размещение и возврат) исключены из основного отчета
+    """)
