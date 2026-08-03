@@ -406,15 +406,14 @@ def fill_closing_coefficient_rate_salary(cleaned_df, hvosty_df):
     # Добавляем колонку с количеством хвостов для каждого Логин RS
     df['хвосты_count'] = df['Логин RS'].map(hvosty_counts).fillna(0).astype(int)
     
+
     # ============ 2. Закрытие ============
-    # Закрытие = Квота / (Квота + Хвосты)
+    # Закрытие = Квота / (Квота + Хвосты) в %
     df['закрытие'] = df.apply(
-        lambda row: row['квота'] / (row['квота'] + row['хвосты_count']) 
+        lambda row: (row['квота'] / (row['квота'] + row['хвосты_count']) * 100)
         if (row['квота'] + row['хвосты_count']) > 0 else 0,
         axis=1
-    )
-    # Округляем до 3 знаков и преобразуем в проценты для отображения
-    df['закрытие_процент'] = (df['закрытие'] * 100).round(2)
+    ).round(2)
     
     # ============ 3. Коэффициент ============
     def get_coefficient(closing):
