@@ -311,8 +311,8 @@ def fill_project_motivation(cleaned_df, project_motivation_df):
         
         # Заполняем Проектная мотивация
         def get_motivation(row):
-            project = str(row['Проекты']).strip()
-            return motivation_dict.get(project, 0)
+            client_name = str(row['ClientName']).strip()
+            return motivation_dict.get(client_name, 0)
         
         df['проектная мотивация'] = df.apply(get_motivation, axis=1)
     
