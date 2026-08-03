@@ -417,9 +417,9 @@ def fill_closing_coefficient_rate_salary(cleaned_df, hvosty_df):
     
     # ============ 3. Коэффициент ============
     def get_coefficient(closing):
-        if closing >= 1.0:
+        if closing >= 100:
             return 1.0
-        elif closing >= 0.99:
+        elif closing >= 99:
             return 0.8
         else:
             return 0.45
