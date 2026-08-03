@@ -114,7 +114,7 @@ def clean_data(df):
                 return "Мониторинги"
             
             # Шаг 3: Опросы
-            if "опрос" in project_type:
+            if any("опрос" in str(val).lower() for val in row.values):
                 return "Опросы"
             
             # Шаг 4: Ротационный (есть "ротац", нет "б")
