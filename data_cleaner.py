@@ -69,7 +69,7 @@ def clean_data(df):
         'корректировка',
         'корректировка на анкету',
         'корректировка холостых',
-        'Итого затраты на эм'
+        'Итого затраты на RS'
     ]
     
     # Вставляем колонки по одной, начиная с позиции после ЭМ
@@ -546,7 +546,7 @@ def fill_recruit_adjustments(cleaned_df, zp_shtrafy_df):
     for col in cols_to_sum:
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
-    df['Итого затраты на эм'] = df[cols_to_sum].sum(axis=1)
+    df['Итого затраты на RS'] = df[cols_to_sum].sum(axis=1)
     
     # Удаляем вспомогательные колонки
     df = df.drop(columns=['мотивация_1_count', 'denominator'])
