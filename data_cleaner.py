@@ -282,32 +282,21 @@ def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
 
 
 def fill_project_motivation(cleaned_df, project_motivation_df):
-    """
-    Заполняет колонку Проектная мотивация
-    
-    Args:
-        cleaned_df: очищенный массив (DataFrame)
-        project_motivation_df: справочник "Проект-Мотивация" (DataFrame)
-    
-    Returns:
-        DataFrame с заполненной колонкой Проектная мотивация
-        и список проектов с ошибками
-    """
     df = cleaned_df.copy()
     invalid_projects = []
     
     if project_motivation_df is not None and not project_motivation_df.empty:
-        # Создаем словарь: Имя проекта → Мотивация
+        # Создаем словарь: Имя клиента → Мотивация
         motivation_dict = {}
         for _, row in project_motivation_df.iterrows():
-            project_name = str(row['Имя проекта']).strip()
+            # ✅ ИСПРАВЛЕНО: Имя клиента
+            client_name = str(row['Имя клиента']).strip()
             motivation = row['Мотивация']
             
-            # Проверяем, что мотивация = 1
             if motivation != 1:
-                invalid_projects.append(project_name)
+                invalid_projects.append(client_name)
             
-            motivation_dict[project_name] = motivation
+            motivation_dict[client_name] = motivation
         
         # Заполняем Проектная мотивация
         def get_motivation(row):
