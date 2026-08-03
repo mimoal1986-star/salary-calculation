@@ -31,7 +31,8 @@ ACC_REPLACEMENTS = {
 COLUMN_RENAME_MAP = {
     "ACC": "ASM",
     "ЭМ": "RS",
-    "логин эм": "Логин RS"
+    "логин эм": "Логин RS",
+    "зп эм": "зп RS"
 }
 
 
@@ -477,7 +478,7 @@ def fill_closing_coefficient_rate_salary(cleaned_df, hvosty_df):
     )
     
     # Удаляем вспомогательные колонки
-    df = df.drop(columns=['хвосты_count', 'закрытие_процент', 'мотивация_1_count'])
+    df = df.drop(columns=['хвосты_count', 'мотивация_1_count'])
     
     return df
 
