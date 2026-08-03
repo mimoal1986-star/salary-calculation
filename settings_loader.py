@@ -133,14 +133,11 @@ def load_project_motivation(file):
     try:
         df = pd.read_excel(file, engine='openpyxl')
         
-        if 'Имя проекта' not in df.columns or 'Мотивация' not in df.columns:
-            return {
-                'status': 'error',
-                'message': "Файл должен содержать колонки 'Имя проекта' и 'Мотивация'"
-            }
-        
-        df = df[['Имя проекта', 'Мотивация']].copy()
-        df = df.dropna(subset=['Имя проекта', 'Мотивация'])
+        if 'Имя клиента' not in df.columns or 'Мотивация' not in df.columns:
+            return "Файл должен содержать колонки 'Имя клиента' и 'Мотивация'"
+        df = df[['Имя клиента', 'Мотивация']].copy()
+
+        df = df.dropna(subset=['Имя клиента', 'Мотивация'])
         
         invalid = df[df['Мотивация'] != 1]
         
