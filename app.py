@@ -135,12 +135,20 @@ with tab1:
                 key="zp_shtrafy",
                 label_visibility="collapsed"
             )
+            
+            # Показываем статус, даже если файл не загружен сейчас
+            if st.session_state.zp_shtrafy_df is not None:
+                st.success(f"✅ Загружено: {len(st.session_state.zp_shtrafy_df)} записей")
+            elif zp_file is None:
+                st.info("📎 Файл не загружен")
+            
             if zp_file is not None:
                 with st.spinner("Загрузка ЗП_штрафы..."):
                     try:
                         df_shtrafy = pd.read_excel(zp_file, engine='openpyxl')
                         st.session_state.zp_shtrafy_df = df_shtrafy
                         st.toast(f"✅ Загружено {len(df_shtrafy)} записей", icon="✅")
+                        st.rerun()  # ← Обновляем страницу, чтобы увидеть статус
                     except Exception as e:
                         st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
         
@@ -152,12 +160,19 @@ with tab1:
                 key="projects_outside_checker",
                 label_visibility="collapsed"
             )
+            
+            if st.session_state.projects_outside_checker_df is not None:
+                st.success(f"✅ Загружено: {len(st.session_state.projects_outside_checker_df)} записей")
+            elif projects_file is None:
+                st.info("📎 Файл не загружен")
+            
             if projects_file is not None:
                 with st.spinner("Загрузка Проекты вне чеккера..."):
                     try:
                         df_projects = pd.read_excel(projects_file, engine='openpyxl')
                         st.session_state.projects_outside_checker_df = df_projects
                         st.toast(f"✅ Загружено {len(df_projects)} записей", icon="✅")
+                        st.rerun()
                     except Exception as e:
                         st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
         
@@ -169,12 +184,19 @@ with tab1:
                 key="hvosty",
                 label_visibility="collapsed"
             )
+            
+            if st.session_state.hvosty_df is not None:
+                st.success(f"✅ Загружено: {len(st.session_state.hvosty_df)} записей")
+            elif hvosty_file is None:
+                st.info("📎 Файл не загружен")
+            
             if hvosty_file is not None:
                 with st.spinner("Загрузка Хвосты..."):
                     try:
                         df_hvosty = pd.read_excel(hvosty_file, engine='openpyxl')
                         st.session_state.hvosty_df = df_hvosty
                         st.toast(f"✅ Загружено {len(df_hvosty)} записей", icon="✅")
+                        st.rerun()
                     except Exception as e:
                         st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
         
