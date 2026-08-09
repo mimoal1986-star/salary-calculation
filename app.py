@@ -11,7 +11,7 @@ from data_cleaner import (
     fill_separate_motivation,
     fill_quota,
     fill_closing_coefficient_rate_salary,
-    fill_recruit_adjustments  # ← НОВАЯ ФУНКЦИЯ
+    fill_recruit_adjustments
 )
 from report_generator import create_cleaned_excel, create_deleted_excel, get_filename
 from settings_loader import (
@@ -78,6 +78,17 @@ with tab1:
         type=['xlsx', 'xls'],
         key="main_file"
     )
+    
+    # ==================== СБРОС ПРИ ОТСУТСТВИИ ФАЙЛА ====================
+    # Если файл не загружен, но в сессии есть данные → сбрасываем
+    if uploaded_file is None and st.session_state.original_df is not None:
+        st.session_state.original_df = None
+        st.session_state.is_cleaned = False
+        st.session_state.cleaned_excel = None
+        st.session_state.deleted_excel = None
+        st.session_state.cleaned_rows = 0
+        st.session_state.deleted_rows = 0
+        st.session_state.columns_valid = False
     
     if uploaded_file is not None:
         # Сбрасываем старые данные при загрузке нового файла
@@ -148,7 +159,6 @@ with tab1:
                         df_shtrafy = pd.read_excel(zp_file, engine='openpyxl')
                         st.session_state.zp_shtrafy_df = df_shtrafy
                         st.toast(f"✅ Загружено {len(df_shtrafy)} записей", icon="✅")
-                        st.rerun()  # ← Обновляем страницу, чтобы увидеть статус
                     except Exception as e:
                         st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
         
@@ -172,7 +182,6 @@ with tab1:
                         df_projects = pd.read_excel(projects_file, engine='openpyxl')
                         st.session_state.projects_outside_checker_df = df_projects
                         st.toast(f"✅ Загружено {len(df_projects)} записей", icon="✅")
-                        st.rerun()
                     except Exception as e:
                         st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
         
@@ -196,7 +205,6 @@ with tab1:
                         df_hvosty = pd.read_excel(hvosty_file, engine='openpyxl')
                         st.session_state.hvosty_df = df_hvosty
                         st.toast(f"✅ Загружено {len(df_hvosty)} записей", icon="✅")
-                        st.rerun()
                     except Exception as e:
                         st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
         
@@ -263,7 +271,6 @@ with tab1:
                 except Exception as e:
                     st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
                     st.exception(e)
-            
         
         # ==================== СКАЧИВАНИЕ ====================
         if st.session_state.is_cleaned:
