@@ -80,25 +80,32 @@ with tab1:
     )
     
     if uploaded_file is not None:
-        # Загружаем файл (только один раз)
-        if st.session_state.original_df is None:
-            with st.spinner("Загрузка файла..."):
-                df, error = load_excel(uploaded_file)
-                if error:
-                    st.error(f"❌ {error}")
-                    st.stop()
-                
-                is_valid, error_msg, _ = validate_columns(df)
-                if not is_valid:
-                    st.error(f"❌ {error_msg}")
-                    st.session_state.columns_valid = False
-                    st.stop()
-                else:
-                    st.session_state.columns_valid = True
-                
-                st.session_state.original_df = df
-                st.session_state.total_rows = len(df)
-                st.session_state.is_cleaned = False
+        # Сбрасываем старые данные при загрузке нового файла
+        st.session_state.original_df = None
+        st.session_state.is_cleaned = False
+        st.session_state.cleaned_excel = None
+        st.session_state.deleted_excel = None
+        st.session_state.cleaned_rows = 0
+        st.session_state.deleted_rows = 0
+        st.session_state.columns_valid = False
+        
+        with st.spinner("Загрузка файла..."):
+            df, error = load_excel(uploaded_file)
+            if error:
+                st.error(f"❌ {error}")
+                st.stop()
+            
+            is_valid, error_msg, _ = validate_columns(df)
+            if not is_valid:
+                st.error(f"❌ {error_msg}")
+                st.session_state.columns_valid = False
+                st.stop()
+            else:
+                st.session_state.columns_valid = True
+            
+            st.session_state.original_df = df
+            st.session_state.total_rows = len(df)
+            st.session_state.is_cleaned = False
         
         df = st.session_state.original_df
         
