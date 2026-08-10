@@ -8,15 +8,15 @@ import streamlit as st
 
 # Обязательные колонки
 REQUIRED_COLUMNS = [
-    "Портал", "ACC", "Менеджер", "РП", "Тип проекта (р/бр/неполевой)",
-    "CritID", "FinishTime", "CritStatus", "SetName", "SetCode",
-    "ClientName", "ClientID", "Client_Account_Manager", "BranchName",
-    "BranchFullname", "BranchCode", "BranchID", "Address", "CityName",
-    "RegionName согласно распределения АСС", "RegionName",
-    "Тайный покупатель Fullname", "Тайный покупатель ID",
-    "Тайный покупатель Username", "CritID", "Проекты", "Тариф",
-    "Копирайт", "Проезд", "Компенсация за покупку", "Penalty",
-    "Бонус", "ВСЕГО"
+    "ACC",
+    "Тип проекта (р/бр/неполевой)",
+    "SetCode",
+    "ClientName",
+    "BranchName",
+    "BranchID",
+    "RegionName согласно распределения АСС",
+    "Проекты",
+    "ВСЕГО"
 ]
 
 
