@@ -230,7 +230,7 @@ def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
         login_to_name = {}
         name_to_login = {}
         for _, row in name_login_df.iterrows():
-            login = str(row['логин эм']).strip()
+            login = str(row['логин эм']).strip().lower()
             name = str(row['ЭМ']).strip()
             login_to_name[login] = name
             name_to_login[name] = login
