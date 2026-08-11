@@ -195,6 +195,30 @@ with tab1:
                     progress_bar.progress(10, text="Очистка данных...")
                     cleaned_df, deleted_df = clean_data(df)
                     
+                    # ============================================================
+                    # 1. СНАЧАЛА ЧИТАЕМ СПРАВОЧНИКИ ИЗ uploaded_files
+                    # ============================================================
+                    projects_file = st.session_state.uploaded_files.get('projects_outside_checker')
+                    if projects_file is not None:
+                        df_projects, _ = load_excel(projects_file, "projects_outside_checker")
+                        st.session_state.projects_outside_checker_df = df_projects
+                        st.session_state.projects_outside_checker_time = datetime.now().strftime("%d.%m.%Y %H:%M")
+                    
+                    zp_file = st.session_state.uploaded_files.get('zp_shtrafy')
+                    if zp_file is not None:
+                        df_shtrafy, _ = load_excel(zp_file, "zp_shtrafy")
+                        st.session_state.zp_shtrafy_df = df_shtrafy
+                        st.session_state.zp_shtrafy_time = datetime.now().strftime("%d.%m.%Y %H:%M")
+                    
+                    hvosty_file = st.session_state.uploaded_files.get('hvosty')
+                    if hvosty_file is not None:
+                        df_hvosty, _ = load_excel(hvosty_file, "hvosty")
+                        st.session_state.hvosty_df = df_hvosty
+                        st.session_state.hvosty_time = datetime.now().strftime("%d.%m.%Y %H:%M")
+                    
+                    # ============================================================
+                    # 2. ТЕПЕРЬ ЗАПОЛНЯЕМ Логин RS и RS (с уже загруженным справочником)
+                    # ============================================================
                     progress_bar.progress(25, text="Заполнение Логин RS и RS...")
                     if st.session_state.projects_outside_checker_df is not None:
                         cleaned_df = fill_rs_and_em(
@@ -203,10 +227,9 @@ with tab1:
                             st.session_state.name_login_df
                         )
                     
-                    # 🔍 ПОШАГОВАЯ ДИАГНОСТИКА (ВСТАВИТЬ В ИНТЕРФЕЙС)
+                    # 🔍 ПОШАГОВАЯ ДИАГНОСТИКА
                     st.subheader("🔍 ПОШАГОВАЯ ДИАГНОСТИКА fill_rs_and_em()")
                     
-                    # Проверяем наличие koordinator52 после всех шагов
                     if 'Логин RS' in cleaned_df.columns:
                         mask_final = cleaned_df['Логин RS'].astype(str).str.lower().str.strip() == 'koordinator52'
                         if mask_final.any():
@@ -218,7 +241,6 @@ with tab1:
                     else:
                         st.error("❌ Колонка 'Логин RS' отсутствует")
                     
-                    # Проверяем справочники
                     st.write(f"\n**1. Справочник 'Проекты вне чеккера':**")
                     if st.session_state.projects_outside_checker_df is not None:
                         st.success(f"✅ ЗАГРУЖЕН В session_state ({len(st.session_state.projects_outside_checker_df)} записей)")
@@ -238,7 +260,6 @@ with tab1:
                     else:
                         st.error("❌ НЕ ЗАГРУЖЕН")
                     
-                    # Проверяем наличие koordinator52 в Логин RS
                     if 'Логин RS' in cleaned_df.columns:
                         mask_step1 = cleaned_df['Логин RS'].astype(str).str.lower().str.strip() == 'koordinator52'
                         st.write(f"\n**3. koordinator52 в Логин RS:**")
@@ -247,7 +268,9 @@ with tab1:
                         else:
                             st.warning("❌ НЕ НАЙДЕН")
                     
-                    # Остальные расчеты
+                    # ============================================================
+                    # 3. ОСТАЛЬНЫЕ РАСЧЕТЫ
+                    # ============================================================
                     progress_bar.progress(35, text="Заполнение Проектная мотивация...")
                     project_motivation_data = load_from_json_github('project_motivation')
                     if project_motivation_data is not None:
