@@ -221,10 +221,15 @@ with tab1:
                     # Проверяем справочники
                     st.write(f"\n**1. Справочник 'Проекты вне чеккера':**")
                     if st.session_state.projects_outside_checker_df is not None:
-                        st.success(f"✅ ЗАГРУЖЕН ({len(st.session_state.projects_outside_checker_df)} записей)")
-                        st.write(f"   Колонки: {list(st.session_state.projects_outside_checker_df.columns)}")
+                        st.success(f"✅ ЗАГРУЖЕН В session_state ({len(st.session_state.projects_outside_checker_df)} записей)")
                     else:
-                        st.error("❌ НЕ ЗАГРУЖЕН")
+                        st.error("❌ НЕ ЗАГРУЖЕН В session_state")
+                    
+                    st.write(f"   Проверка uploaded_files:")
+                    if 'projects_outside_checker' in st.session_state.uploaded_files:
+                        st.success("✅ Файл есть в uploaded_files")
+                    else:
+                        st.error("❌ Файла нет в uploaded_files")
                     
                     st.write(f"\n**2. Справочник 'Имя-логин':**")
                     if st.session_state.name_login_df is not None:
