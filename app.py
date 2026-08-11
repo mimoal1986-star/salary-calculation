@@ -49,7 +49,7 @@ DEFAULT_STATE = {
     'hvosty_df': None,
     'hvosty_time': None,
     'name_login_df': None,
-    'uploader_key': 0
+    'uploaded_files': {}
 }
 
 for key, default_value in DEFAULT_STATE.items():
@@ -69,36 +69,16 @@ tab1, tab2 = st.tabs(["📊 Основная", "⚙️ Настройки"])
 with tab1:
     st.markdown("---")
     
-    # Загрузка файла с динамическим ключом
+    # Загрузка файла (статический ключ, как в ПФ)
     uploaded_file = st.file_uploader(
         "📁 Загрузите Excel-файл 'Массив итоги месяца'",
         type=['xlsx', 'xls'],
-        key=f"main_file_{st.session_state.uploader_key}"
+        key="main_file"
     )
     
-    # ==================== ЗАГРУЗКА ФАЙЛА ====================
+    # Сохраняем файл в uploaded_files (как в ПФ)
     if uploaded_file is not None:
-        # Загружаем файл (только один раз)
-        if st.session_state.original_df is None:
-            with st.spinner("Загрузка файла..."):
-                df, error = load_excel(uploaded_file)
-                if error:
-                    st.error(f"❌ {error}")
-                    st.stop()
-                
-                is_valid, error_msg, _ = validate_columns(df)
-                if not is_valid:
-                    st.error(f"❌ {error_msg}")
-                    st.session_state.columns_valid = False
-                    st.stop()
-                else:
-                    st.session_state.columns_valid = True
-                
-                st.session_state.original_df = df
-                st.session_state.total_rows = len(df)
-                st.session_state.is_cleaned = False
-        
-        df = st.session_state.original_df
+        st.session_state.uploaded_files['main_file'] = uploaded_file
     
     # ==================== СТАТИСТИКА (ВСЕГДА ВИДНА) ====================
     col1, col2, col3 = st.columns(3)
@@ -117,7 +97,7 @@ with tab1:
     
     st.markdown("---")
     
-    # ==================== ДОПОЛНИТЕЛЬНЫЕ ЗАГРУЗЧИКИ (ВСЕГДА ВИДНЫ) ====================
+    # ==================== ДОПОЛНИТЕЛЬНЫЕ ЗАГРУЗЧИКИ ====================
     st.subheader("📁 Дополнительные справочники")
     
     col1, col2, col3 = st.columns(3)
@@ -127,76 +107,57 @@ with tab1:
         zp_file = st.file_uploader(
             "Загрузите файл",
             type=['xlsx', 'xls'],
-            key=f"zp_shtrafy_{st.session_state.uploader_key}",
+            key="zp_shtrafy",
             label_visibility="collapsed"
         )
         
+        # Сохраняем в uploaded_files
+        if zp_file is not None:
+            st.session_state.uploaded_files['zp_shtrafy'] = zp_file
+        
+        # Статус (опционально, для UX)
         if st.session_state.zp_shtrafy_df is not None:
             st.success(f"✅ Загружено: {len(st.session_state.zp_shtrafy_df)} записей")
             if st.session_state.zp_shtrafy_time:
                 st.caption(f"🕐 {st.session_state.zp_shtrafy_time}")
-        
-        if zp_file is not None:
-            with st.spinner("Загрузка ЗП_штрафы..."):
-                try:
-                    df_shtrafy = pd.read_excel(zp_file, engine='openpyxl')
-                    st.session_state.zp_shtrafy_df = df_shtrafy
-                    st.session_state.zp_shtrafy_time = datetime.now().strftime("%d.%m.%Y %H:%M")
-                    st.toast(f"✅ Загружено {len(df_shtrafy)} записей", icon="✅")
-                except Exception as e:
-                    st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
     
     with col2:
         st.caption("Проекты вне чеккера")
         projects_file = st.file_uploader(
             "Загрузите файл",
             type=['xlsx', 'xls'],
-            key=f"projects_outside_checker_{st.session_state.uploader_key}",
+            key="projects_outside_checker",
             label_visibility="collapsed"
         )
+        
+        if projects_file is not None:
+            st.session_state.uploaded_files['projects_outside_checker'] = projects_file
         
         if st.session_state.projects_outside_checker_df is not None:
             st.success(f"✅ Загружено: {len(st.session_state.projects_outside_checker_df)} записей")
             if st.session_state.projects_outside_checker_time:
                 st.caption(f"🕐 {st.session_state.projects_outside_checker_time}")
-        
-        if projects_file is not None:
-            with st.spinner("Загрузка Проекты вне чеккера..."):
-                try:
-                    df_projects = pd.read_excel(projects_file, engine='openpyxl')
-                    st.session_state.projects_outside_checker_df = df_projects
-                    st.session_state.projects_outside_checker_time = datetime.now().strftime("%d.%m.%Y %H:%M")
-                    st.toast(f"✅ Загружено {len(df_projects)} записей", icon="✅")
-                except Exception as e:
-                    st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
     
     with col3:
         st.caption("Хвосты")
         hvosty_file = st.file_uploader(
             "Загрузите файл",
             type=['xlsx', 'xls'],
-            key=f"hvosty_{st.session_state.uploader_key}",
+            key="hvosty",
             label_visibility="collapsed"
         )
+        
+        if hvosty_file is not None:
+            st.session_state.uploaded_files['hvosty'] = hvosty_file
         
         if st.session_state.hvosty_df is not None:
             st.success(f"✅ Загружено: {len(st.session_state.hvosty_df)} записей")
             if st.session_state.hvosty_time:
                 st.caption(f"🕐 {st.session_state.hvosty_time}")
-        
-        if hvosty_file is not None:
-            with st.spinner("Загрузка Хвосты..."):
-                try:
-                    df_hvosty = pd.read_excel(hvosty_file, engine='openpyxl')
-                    st.session_state.hvosty_df = df_hvosty
-                    st.session_state.hvosty_time = datetime.now().strftime("%d.%m.%Y %H:%M")
-                    st.toast(f"✅ Загружено {len(df_hvosty)} записей", icon="✅")
-                except Exception as e:
-                    st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
     
     st.markdown("---")
     
-    # ==================== КНОПКА СБРОСА ====================
+    # ==================== КНОПКА СБРОСА (КАК В ПФ) ====================
     if st.button("🗑️ Сбросить все данные", use_container_width=True):
         # 1. Очищаем кэш загрузки
         clear_cache()
@@ -205,30 +166,69 @@ with tab1:
         for key in list(DEFAULT_STATE.keys()):
             st.session_state[key] = DEFAULT_STATE[key]
         
-        # 3. Меняем ключ → сбрасываем все file_uploader
-        st.session_state.uploader_key += 1
-        
-        # 4. Показываем уведомление (без st.rerun())
         st.success("✅ Все данные и кэш очищены")
+        st.rerun()
     
     st.markdown("---")
     
     # ==================== КНОПКА ЗАПУСКА ====================
-    # Кнопка активна только если загружен основной файл
-    if st.session_state.original_df is not None:
+    # Проверяем наличие основного файла в uploaded_files
+    main_file_exists = 'main_file' in st.session_state.uploaded_files
+    
+    if main_file_exists:
         if st.button("🚀 Запустить расчет", type="primary", use_container_width=True):
             with st.spinner("Выполняется расчет..."):
                 try:
-                    df = st.session_state.original_df
+                    # 1. Очищаем uploaded_files перед расчетом (как в ПФ)
+                    # st.session_state.uploaded_files = {}
                     
-                    # Прогресс-бар
+                    # 2. Читаем файлы из uploaded_files (как в ПФ)
+                    main_file = st.session_state.uploaded_files.get('main_file')
+                    zp_file = st.session_state.uploaded_files.get('zp_shtrafy')
+                    projects_file = st.session_state.uploaded_files.get('projects_outside_checker')
+                    hvosty_file = st.session_state.uploaded_files.get('hvosty')
+                    
+                    # 3. Загружаем данные
+                    df, error = load_excel(main_file, "main_file")
+                    if error:
+                        st.error(f"❌ {error}")
+                        st.stop()
+                    
+                    # Проверяем колонки
+                    is_valid, error_msg, _ = validate_columns(df)
+                    if not is_valid:
+                        st.error(f"❌ {error_msg}")
+                        st.session_state.columns_valid = False
+                        st.stop()
+                    else:
+                        st.session_state.columns_valid = True
+                    
+                    st.session_state.original_df = df
+                    st.session_state.total_rows = len(df)
+                    st.session_state.is_cleaned = False
+                    
+                    # Загружаем справочники (если есть)
+                    if zp_file is not None:
+                        df_shtrafy, _ = load_excel(zp_file, "zp_shtrafy")
+                        st.session_state.zp_shtrafy_df = df_shtrafy
+                        st.session_state.zp_shtrafy_time = datetime.now().strftime("%d.%m.%Y %H:%M")
+                    
+                    if projects_file is not None:
+                        df_projects, _ = load_excel(projects_file, "projects_outside_checker")
+                        st.session_state.projects_outside_checker_df = df_projects
+                        st.session_state.projects_outside_checker_time = datetime.now().strftime("%d.%m.%Y %H:%M")
+                    
+                    if hvosty_file is not None:
+                        df_hvosty, _ = load_excel(hvosty_file, "hvosty")
+                        st.session_state.hvosty_df = df_hvosty
+                        st.session_state.hvosty_time = datetime.now().strftime("%d.%m.%Y %H:%M")
+                    
+                    # ============ РАСЧЕТ ============
                     progress_bar = st.progress(0, text="Начинаем расчет...")
                     
-                    # Шаг 1: Очистка данных
                     progress_bar.progress(10, text="Очистка данных...")
                     cleaned_df, deleted_df = clean_data(df)
                     
-                    # Шаг 2: Заполнение Логин RS и RS (бывшая ЭМ)
                     progress_bar.progress(25, text="Заполнение Логин RS и RS...")
                     if st.session_state.projects_outside_checker_df is not None:
                         cleaned_df = fill_rs_and_em(
@@ -237,7 +237,6 @@ with tab1:
                             st.session_state.name_login_df
                         )
                     
-                    # Шаг 3: Заполнение Проектная мотивация
                     progress_bar.progress(35, text="Заполнение Проектная мотивация...")
                     project_motivation_data = load_from_json_github('project_motivation')
                     if project_motivation_data is not None:
@@ -246,7 +245,6 @@ with tab1:
                         if invalid_projects:
                             st.warning(f"⚠️ Проекты с мотивацией ≠ 1: {', '.join(invalid_projects)}")
                     
-                    # Шаг 4: Заполнение Тип квоты (Регион-Тип)
                     progress_bar.progress(45, text="Заполнение Тип квоты...")
                     region_type_data = load_from_json_github('region_type')
                     if region_type_data is not None:
@@ -255,27 +253,21 @@ with tab1:
                         if invalid_regions:
                             st.warning(f"⚠️ Регионы не найдены в справочнике: {', '.join(invalid_regions)}")
                     
-                    # Шаг 5: Заполнение отдельная мотивация = ЧТО-ТО - ВСЕГО
                     progress_bar.progress(55, text="Заполнение отдельная мотивация...")
                     cleaned_df = fill_separate_motivation(cleaned_df)
                     
-                    # Шаг 6: Заполнение квота = количество записей по Логин RS
                     progress_bar.progress(65, text="Заполнение квота...")
                     cleaned_df = fill_quota(cleaned_df)
 
-                    # Шаг 7: Заполнение закрытие, коэффициент, ставка, зп эм, надбавка за квоту, надбавка на анкету
                     progress_bar.progress(75, text="Расчет закрытия, коэффициента, ставки...")
                     cleaned_df = fill_closing_coefficient_rate_salary(cleaned_df, st.session_state.hvosty_df)
                     
-                    # Шаг 8: Заполнение рекрут, рекрут на анкету, корректировка, корректировка на анкету, корректировка холостых, Итого затраты на эм
                     progress_bar.progress(90, text="Расчет рекрута и корректировок...")
                     cleaned_df = fill_recruit_adjustments(cleaned_df, st.session_state.zp_shtrafy_df)
                     
-                    # Шаг 9: Округление всех дробных чисел до 2 знаков
                     progress_bar.progress(95, text="Округление...")
                     cleaned_df = cleaned_df.round(2)
 
-                    # Сохранение результатов
                     progress_bar.progress(100, text="Сохранение результатов...")
                     st.session_state.cleaned_excel = create_cleaned_excel(cleaned_df)
                     if not deleted_df.empty:
@@ -287,9 +279,7 @@ with tab1:
                     st.session_state.cleaned_rows = len(cleaned_df)
                     st.session_state.deleted_rows = len(deleted_df)
                     
-                    # Убираем прогресс-бар после завершения
                     progress_bar.empty()
-                    
                     st.toast("✅ Расчет завершен!", icon="✅")
                     
                 except Exception as e:
