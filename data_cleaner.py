@@ -209,26 +209,16 @@ def clean_data(df):
 def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
     """
     Заполняет колонки Логин RS и RS (бывшая ЭМ)
-    
-    Args:
-        cleaned_df: очищенный массив (DataFrame) - уже с переименованными колонками
-        projects_df: справочник "Проекты вне чеккера" (DataFrame)
-        name_login_df: справочник "Имя-логин" (DataFrame)
-    
-    Returns:
-        DataFrame с заполненными колонками
     """
     df = cleaned_df.copy()
     
     # ============ ШАГ 1: Заполнение Логин RS из "Проекты вне чеккера" ============
     if projects_df is not None and not projects_df.empty:
-        # Создаем словарь для быстрого поиска
         project_dict = {}
         for _, row in projects_df.iterrows():
             key = (str(row['номер локации']).strip(), str(row['Код проекта']).strip())
             project_dict[key] = str(row['логин ЭМ кто назначил']).strip()
         
-        # Заполняем Логин RS
         def get_login_rs(row):
             key = (str(row['BranchID']).strip(), str(row['SetCode']).strip())
             return project_dict.get(key, row['Логин RS'])
@@ -237,9 +227,6 @@ def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
     
     # ============ ШАГ 2: Дозаполнение Логин RS через RS (если пусто) ============
     if name_login_df is not None and not name_login_df.empty:
-        # Создаем два словаря:
-        # 1. логин эм → ЭМ (полное имя)
-        # 2. ЭМ (полное имя) → логин эм (обратный поиск)
         login_to_name = {}
         name_to_login = {}
         for _, row in name_login_df.iterrows():
@@ -248,14 +235,11 @@ def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
             login_to_name[login] = name
             name_to_login[name] = login
         
-        # Дозаполняем Логин RS через RS
         def fill_login_rs(row):
             login_rs = str(row['Логин RS']).strip()
             rs_value = str(row['RS']).strip()
             
-            # Если Логин RS пустой и RS заполнена
             if login_rs == '' and rs_value != '':
-                # Ищем RS (полное имя) в словаре name_to_login
                 if rs_value in name_to_login:
                     return name_to_login[rs_value]
             
@@ -276,6 +260,40 @@ def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
     
         df['RS'] = df.apply(get_rs, axis=1)
     
+    # ==================== ПОШАГОВАЯ ДИАГНОСТИКА ====================
+    print("\n" + "="*60)
+    print("🔍 ПОШАГОВАЯ ДИАГНОСТИКА fill_rs_and_em()")
+    print("="*60)
+    
+    # Ищем строку с koordinator52 в Логин RS (после всех шагов)
+    mask_final = df['Логин RS'].astype(str).str.lower().str.strip() == 'koordinator52'
+    if mask_final.any():
+        print(f"✅ ПОСЛЕ ВСЕХ ШАГОВ: найдена строка с koordinator52")
+        row = df[mask_final].iloc[0]
+        print(f"   RS = '{row['RS']}'")
+    else:
+        print(f"❌ ПОСЛЕ ВСЕХ ШАГОВ: строка с koordinator52 НЕ НАЙДЕНА")
+    
+    # Проверяем наличие справочников
+    print(f"\n1. Справочник 'Проекты вне чеккера': {'ЗАГРУЖЕН' if projects_df is not None else 'НЕ ЗАГРУЖЕН'}")
+    if projects_df is not None:
+        print(f"   - Количество записей: {len(projects_df)}")
+        print(f"   - Колонки: {list(projects_df.columns)}")
+    
+    print(f"\n2. Справочник 'Имя-логин': {'ЗАГРУЖЕН' if name_login_df is not None else 'НЕ ЗАГРУЖЕН'}")
+    if name_login_df is not None:
+        print(f"   - Количество записей: {len(name_login_df)}")
+        print(f"   - Колонки: {list(name_login_df.columns)}")
+    
+    # Проверяем, есть ли koordinator52 в Логин RS ПОСЛЕ ШАГА 1
+    if 'Логин RS' in df.columns:
+        mask_step1 = df['Логин RS'].astype(str).str.lower().str.strip() == 'koordinator52'
+        print(f"\n3. ПОСЛЕ ШАГА 1: {'✅ НАЙДЕНА' if mask_step1.any() else '❌ НЕ НАЙДЕНА'}")
+    else:
+        print(f"\n3. ПОСЛЕ ШАГА 1: колонка 'Логин RS' отсутствует")
+    
+    print("="*60 + "\n")
+    
     return df
 
 
@@ -284,10 +302,8 @@ def fill_project_motivation(cleaned_df, project_motivation_df):
     invalid_projects = []
     
     if project_motivation_df is not None and not project_motivation_df.empty:
-        # Создаем словарь: Имя клиента → Мотивация
         motivation_dict = {}
         for _, row in project_motivation_df.iterrows():
-            # ✅ ИСПРАВЛЕНО: Имя клиента
             client_name = str(row['Имя клиента']).strip()
             motivation = row['Мотивация']
             
@@ -296,7 +312,6 @@ def fill_project_motivation(cleaned_df, project_motivation_df):
             
             motivation_dict[client_name] = motivation
         
-        # Заполняем Проектная мотивация
         def get_motivation(row):
             client_name = str(row['ClientName']).strip()
             return motivation_dict.get(client_name, 0)
@@ -307,36 +322,22 @@ def fill_project_motivation(cleaned_df, project_motivation_df):
 
 
 def fill_region_type(cleaned_df, region_type_df):
-    """
-    Заполняет колонку Тип квоты из справочника Регион-Тип
-    
-    Args:
-        cleaned_df: очищенный массив (DataFrame)
-        region_type_df: справочник "Регион-Тип" (DataFrame)
-    
-    Returns:
-        DataFrame с заполненной колонкой Тип квоты
-        и список регионов с ошибками
-    """
     df = cleaned_df.copy()
     invalid_regions = []
     
     if region_type_df is not None and not region_type_df.empty:
-        # Создаем словарь: Lo → ДВ (Тип)
         region_dict = {}
         for _, row in region_type_df.iterrows():
             lo = str(row['Lo']).strip()
             region_type = str(row['ДВ']).strip()
             region_dict[lo] = region_type
         
-        # Заполняем Тип квоты
         def get_region_type(row):
             region = str(row['RegionName согласно распределения АСС']).strip()
             return region_dict.get(region, '')
         
         df['Тип квоты'] = df.apply(get_region_type, axis=1)
         
-        # Находим регионы, которых нет в справочнике
         all_regions = df['RegionName согласно распределения АСС'].astype(str).str.strip().unique()
         missing_regions = [r for r in all_regions if r and r not in region_dict]
         if missing_regions:
@@ -344,22 +345,14 @@ def fill_region_type(cleaned_df, region_type_df):
     
     return df, invalid_regions
 
+
 def fill_separate_motivation(cleaned_df):
-    """
-    Заполняет колонку отдельная мотивация
-    
-    Логика:
-    - Если проектная мотивация = 1 → отдельная мотивация = ЧТО-ТО - ВСЕГО
-    - Иначе → отдельная мотивация = пусто
-    """
     df = cleaned_df.copy()
     
-    # Преобразуем колонки в числа
     df['ЧТО-ТО'] = pd.to_numeric(df['ЧТО-ТО'], errors='coerce').fillna(0)
     df['ВСЕГО'] = pd.to_numeric(df['ВСЕГО'], errors='coerce').fillna(0)
     df['проектная мотивация'] = pd.to_numeric(df['проектная мотивация'], errors='coerce').fillna(0)
     
-    # Если проектная мотивация = 1 → ЧТО-ТО - ВСЕГО, иначе пусто
     df['отдельная мотивация'] = df.apply(
         lambda row: row['ЧТО-ТО'] - row['ВСЕГО'] if row['проектная мотивация'] == 1 else '',
         axis=1
@@ -367,53 +360,31 @@ def fill_separate_motivation(cleaned_df):
     
     return df
 
+
 def fill_quota(cleaned_df):
-    """
-    Заполняет колонку квота = количество записей по каждому Логин RS
-    """
     df = cleaned_df.copy()
     
-    # Считаем количество записей по каждому Логин RS
     quota_counts = df.groupby('Логин RS').size().to_dict()
-    
-    # Заполняем квоту
     df['квота'] = df['Логин RS'].map(quota_counts).fillna(0).astype(int)
     
     return df
 
+
 def fill_closing_coefficient_rate_salary(cleaned_df, hvosty_df):
-    """
-    Заполняет колонки: закрытие, коэффициент, ставка, зп эм,
-    надбавка за квоту, надбавка на анкету
-    
-    Args:
-        cleaned_df: очищенный массив (DataFrame)
-        hvosty_df: справочник "Хвосты" (DataFrame)
-    
-    Returns:
-        DataFrame с заполненными колонками
-    """
     df = cleaned_df.copy()
     
-    # ============ 1. Считаем Хвосты по каждому Логин RS ============
     hvosty_counts = {}
     if hvosty_df is not None and not hvosty_df.empty:
-        # Считаем количество хвостов по колонке 'эм'
         hvosty_counts = hvosty_df.groupby('эм').size().to_dict()
     
-    # Добавляем колонку с количеством хвостов для каждого Логин RS
     df['хвосты_count'] = df['Логин RS'].map(hvosty_counts).fillna(0).astype(int)
     
-
-    # ============ 2. Закрытие ============
-    # Закрытие = Квота / (Квота + Хвосты) в %
     df['закрытие'] = df.apply(
         lambda row: (row['квота'] / (row['квота'] + row['хвосты_count']) * 100)
         if (row['квота'] + row['хвосты_count']) > 0 else 0,
         axis=1
     ).round(2)
     
-    # ============ 3. Коэффициент ============
     def get_coefficient(closing):
         if closing >= 100:
             return 1.0
@@ -424,34 +395,28 @@ def fill_closing_coefficient_rate_salary(cleaned_df, hvosty_df):
     
     df['коэффициент'] = df['закрытие'].apply(get_coefficient)
     
-    # ============ 4. Ставка ============
     def get_rate(row):
         region_type = str(row['Тип квоты']).strip()
         project_type = str(row['Тип проекта (р/бр/неполевой)']).strip()
         
-        # Определяем тип проекта (ротационный/безротационный)
         is_rotational = 'ротационный' in project_type.lower()
-        
-        # Определяем тип региона
         is_complex = 'сложная' in region_type.lower()
         
         if is_complex:
             if is_rotational:
-                return 150  # Сложная + Ротация
+                return 150
             else:
-                return 85   # Сложная + Без ротации
-        else:  # Обычная
+                return 85
+        else:
             if is_rotational:
-                return 90   # Обычная + Ротация
+                return 90
             else:
-                return 50   # Обычная + Без ротации
+                return 50
     
     df['ставка'] = df.apply(get_rate, axis=1)
     
-    # ============ 5. зп эм = ставка * коэффициент ============
     df['зп RS'] = df['ставка'] * df['коэффициент']
     
-    # ============ 6. надбавка за квоту ============
     def get_bonus(quota):
         if quota >= 550:
             return 12000
@@ -462,91 +427,62 @@ def fill_closing_coefficient_rate_salary(cleaned_df, hvosty_df):
     
     df['надбавка за квоту'] = df['квота'].apply(get_bonus)
     
-    # ============ 7. надбавка на анкету ============
-    # Считаем количество строк с проектная мотивация = 1 по каждому Логин RS
     motivation_1_counts = df[df['проектная мотивация'] == 1].groupby('Логин RS').size().to_dict()
     df['мотивация_1_count'] = df['Логин RS'].map(motivation_1_counts).fillna(0).astype(int)
     
-    # Надбавка на анкету = надбавка за квоту / (квота - кол-во строк с проектная мотивация = 1)
     df['надбавка на анкету'] = df.apply(
         lambda row: row['надбавка за квоту'] / (row['квота'] - row['мотивация_1_count'])
         if (row['квота'] - row['мотивация_1_count']) > 0 else 0,
         axis=1
     )
     
-    # Удаляем вспомогательные колонки
     df = df.drop(columns=['хвосты_count', 'мотивация_1_count'])
     
     return df
 
+
 def fill_recruit_adjustments(cleaned_df, zp_shtrafy_df):
-    """
-    Заполняет колонки: рекрут, рекрут на анкету, корректировка,
-    корректировка на анкету, корректировка холостых, Итого затраты на эм
-    
-    Args:
-        cleaned_df: очищенный массив (DataFrame)
-        zp_shtrafy_df: справочник "ЗП_штрафы" (DataFrame)
-    
-    Returns:
-        DataFrame с заполненными колонками
-    """
     df = cleaned_df.copy()
     
-    # Считаем количество строк с проектная мотивация = 1 по каждому Логин RS
     motivation_1_counts = df[df['проектная мотивация'] == 1].groupby('Логин RS').size().to_dict()
     df['мотивация_1_count'] = df['Логин RS'].map(motivation_1_counts).fillna(0).astype(int)
     
-    # Знаменатель для рекрут на анкету и корректировка на анкету
     df['denominator'] = df['квота'] - df['мотивация_1_count']
-    df['denominator'] = df['denominator'].apply(lambda x: x if x > 0 else 1)  # Защита от деления на 0
+    df['denominator'] = df['denominator'].apply(lambda x: x if x > 0 else 1)
     
-    # ============ 1. Рекрут ============
     if zp_shtrafy_df is not None and not zp_shtrafy_df.empty:
-        # Считаем количество записей по логин эм в ЗП_штрафы
         recruit_counts = zp_shtrafy_df.groupby('логин эм').size().to_dict()
-        
-        # Рекрут = COUNT * 300
         df['рекрут'] = df['Логин RS'].map(recruit_counts).fillna(0).astype(int) * 300
     else:
         df['рекрут'] = 0
     
-    # ============ 2. Рекрут на анкету ============
     df['рекрут на анкету'] = df.apply(
         lambda row: row['рекрут'] / row['denominator'] if row['denominator'] > 0 else 0,
         axis=1
     )
     
-    # ============ 3. Корректировка ============
     if zp_shtrafy_df is not None and not zp_shtrafy_df.empty:
-        # Суммируем штраф/премия по логин эм ЧЕКЕР
         adjustment_sums = zp_shtrafy_df.groupby('логин эм ЧЕКЕР')['штраф/премия'].sum().to_dict()
-        
         df['корректировка'] = df['Логин RS'].map(adjustment_sums).fillna(0)
     else:
         df['корректировка'] = 0
     
-    # ============ 4. Корректировка на анкету ============
     df['корректировка на анкету'] = df.apply(
         lambda row: row['корректировка'] / row['denominator'] if row['denominator'] > 0 else 0,
         axis=1
     )
     
-    # ============ 5. Корректировка холостых ============
     df['корректировка холостых'] = df.apply(
         lambda row: -row['зп RS'] / 2 if str(row['Проекты']).strip() == '_SINGLE' else '',
         axis=1
     )
     
-    # ============ 6. Итого затраты на эм ============
-    # Преобразуем все в числа для суммирования
     cols_to_sum = ['зп RS', 'надбавка на анкету', 'рекрут на анкету', 'корректировка на анкету', 'корректировка холостых']
     for col in cols_to_sum:
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
     df['Итого затраты на RS'] = df[cols_to_sum].sum(axis=1)
     
-    # Удаляем вспомогательные колонки
     df = df.drop(columns=['мотивация_1_count', 'denominator'])
     
     return df
