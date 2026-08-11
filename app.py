@@ -48,7 +48,8 @@ DEFAULT_STATE = {
     'projects_outside_checker_time': None,
     'hvosty_df': None,
     'hvosty_time': None,
-    'name_login_df': None
+    'name_login_df': None,
+    'uploader_key': 0
 }
 
 for key, default_value in DEFAULT_STATE.items():
@@ -68,11 +69,11 @@ tab1, tab2 = st.tabs(["📊 Основная", "⚙️ Настройки"])
 with tab1:
     st.markdown("---")
     
-    # Загрузка файла
+    # Загрузка файла с динамическим ключом
     uploaded_file = st.file_uploader(
         "📁 Загрузите Excel-файл 'Массив итоги месяца'",
         type=['xlsx', 'xls'],
-        key="main_file"
+        key=f"main_file_{st.session_state.uploader_key}"
     )
     
     # ==================== ЗАГРУЗКА ФАЙЛА ====================
@@ -126,19 +127,14 @@ with tab1:
         zp_file = st.file_uploader(
             "Загрузите файл",
             type=['xlsx', 'xls'],
-            key="zp_shtrafy",
+            key=f"zp_shtrafy_{st.session_state.uploader_key}",
             label_visibility="collapsed"
         )
         
-        # ==================== СТАТУС С ПРЕДУПРЕЖДЕНИЕМ О ПЕРЕЗАПИСИ ====================
         if st.session_state.zp_shtrafy_df is not None:
             st.success(f"✅ Загружено: {len(st.session_state.zp_shtrafy_df)} записей")
             if st.session_state.zp_shtrafy_time:
                 st.caption(f"🕐 {st.session_state.zp_shtrafy_time}")
-            if zp_file is not None:
-                st.warning("⚠️ Новый файл перезапишет текущий справочник")
-        else:
-            st.info("📎 Файл не загружен")
         
         if zp_file is not None:
             with st.spinner("Загрузка ЗП_штрафы..."):
@@ -155,7 +151,7 @@ with tab1:
         projects_file = st.file_uploader(
             "Загрузите файл",
             type=['xlsx', 'xls'],
-            key="projects_outside_checker",
+            key=f"projects_outside_checker_{st.session_state.uploader_key}",
             label_visibility="collapsed"
         )
         
@@ -163,10 +159,6 @@ with tab1:
             st.success(f"✅ Загружено: {len(st.session_state.projects_outside_checker_df)} записей")
             if st.session_state.projects_outside_checker_time:
                 st.caption(f"🕐 {st.session_state.projects_outside_checker_time}")
-            if projects_file is not None:
-                st.warning("⚠️ Новый файл перезапишет текущий справочник")
-        else:
-            st.info("📎 Файл не загружен")
         
         if projects_file is not None:
             with st.spinner("Загрузка Проекты вне чеккера..."):
@@ -183,7 +175,7 @@ with tab1:
         hvosty_file = st.file_uploader(
             "Загрузите файл",
             type=['xlsx', 'xls'],
-            key="hvosty",
+            key=f"hvosty_{st.session_state.uploader_key}",
             label_visibility="collapsed"
         )
         
@@ -191,10 +183,6 @@ with tab1:
             st.success(f"✅ Загружено: {len(st.session_state.hvosty_df)} записей")
             if st.session_state.hvosty_time:
                 st.caption(f"🕐 {st.session_state.hvosty_time}")
-            if hvosty_file is not None:
-                st.warning("⚠️ Новый файл перезапишет текущий справочник")
-        else:
-            st.info("📎 Файл не загружен")
         
         if hvosty_file is not None:
             with st.spinner("Загрузка Хвосты..."):
@@ -217,8 +205,11 @@ with tab1:
         for key in list(DEFAULT_STATE.keys()):
             st.session_state[key] = DEFAULT_STATE[key]
         
+        # 3. Меняем ключ → сбрасываем все file_uploader
+        st.session_state.uploader_key += 1
+        
+        # 4. Показываем уведомление (без st.rerun())
         st.success("✅ Все данные и кэш очищены")
-        st.rerun()
     
     st.markdown("---")
     
