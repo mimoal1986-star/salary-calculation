@@ -1,4 +1,4 @@
-# data_loader.py 
+# ==================== data_loader.py ====================
 """
 Загрузка и валидация Excel-файлов
 """
@@ -58,3 +58,10 @@ def validate_columns(df):
         return False, f"Отсутствуют колонки: {', '.join(missing)}", missing
     
     return True, None, None
+
+
+def clear_cache():
+    """
+    Очищает кэш загрузки Excel
+    """
+    load_excel.clear()
