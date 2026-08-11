@@ -21,7 +21,7 @@ REQUIRED_COLUMNS = [
 
 
 @st.cache_data
-def load_excel(file):
+def load_excel(file, file_key):
     """
     Загружает Excel-файл в DataFrame с кэшированием
     
