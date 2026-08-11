@@ -231,13 +231,13 @@ with tab1:
                     st.subheader("🔍 ПОШАГОВАЯ ДИАГНОСТИКА fill_rs_and_em()")
                     
                     if 'Логин RS' in cleaned_df.columns:
-                        mask_final = cleaned_df['Логин RS'].astype(str).str.lower().str.strip() == 'koordinator52'
+                        mask_final = cleaned_df['Логин RS'].astype(str).str.lower().str.strip() == 'Rukovoditel2'
                         if mask_final.any():
-                            st.success("✅ ПОСЛЕ ВСЕХ ШАГОВ: найдена строка с koordinator52")
+                            st.success("✅ ПОСЛЕ ВСЕХ ШАГОВ: найдена строка с Rukovoditel2")
                             row = cleaned_df[mask_final].iloc[0]
                             st.write(f"   RS = '{row['RS']}'")
                         else:
-                            st.warning("❌ ПОСЛЕ ВСЕХ ШАГОВ: строка с koordinator52 НЕ НАЙДЕНА")
+                            st.warning("❌ ПОСЛЕ ВСЕХ ШАГОВ: строка с Rukovoditel2 НЕ НАЙДЕНА")
                     else:
                         st.error("❌ Колонка 'Логин RS' отсутствует")
                     
@@ -261,8 +261,8 @@ with tab1:
                         st.error("❌ НЕ ЗАГРУЖЕН")
                     
                     if 'Логин RS' in cleaned_df.columns:
-                        mask_step1 = cleaned_df['Логин RS'].astype(str).str.lower().str.strip() == 'koordinator52'
-                        st.write(f"\n**3. koordinator52 в Логин RS:**")
+                        mask_step1 = cleaned_df['Логин RS'].astype(str).str.lower().str.strip() == 'Rukovoditel2'
+                        st.write(f"\n**3. Rukovoditel2 в Логин RS:**")
                         if mask_step1.any():
                             st.success("✅ НАЙДЕН")
                         else:
