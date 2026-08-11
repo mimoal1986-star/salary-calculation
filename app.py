@@ -69,18 +69,41 @@ tab1, tab2 = st.tabs(["📊 Основная", "⚙️ Настройки"])
 with tab1:
     st.markdown("---")
     
-    # Загрузка файла (статический ключ, как в ПФ)
+    # Загрузка файла (статический ключ)
     uploaded_file = st.file_uploader(
         "📁 Загрузите Excel-файл 'Массив итоги месяца'",
         type=['xlsx', 'xls'],
         key="main_file"
     )
     
-    # Сохраняем файл в uploaded_files (как в ПФ)
+    # Сохраняем файл в uploaded_files
     if uploaded_file is not None:
         st.session_state.uploaded_files['main_file'] = uploaded_file
     
-    # ==================== СТАТИСТИКА (ВСЕГДА ВИДНА) ====================
+    # ==================== ЗАГРУЗКА ФАЙЛА ====================
+    if uploaded_file is not None:
+        if st.session_state.original_df is None:
+            with st.spinner("Загрузка файла..."):
+                df, error = load_excel(uploaded_file, "main_file")
+                if error:
+                    st.error(f"❌ {error}")
+                    st.stop()
+                
+                is_valid, error_msg, _ = validate_columns(df)
+                if not is_valid:
+                    st.error(f"❌ {error_msg}")
+                    st.session_state.columns_valid = False
+                    st.stop()
+                else:
+                    st.session_state.columns_valid = True
+                
+                st.session_state.original_df = df
+                st.session_state.total_rows = len(df)
+                st.session_state.is_cleaned = False
+        
+        df = st.session_state.original_df
+    
+    # ==================== СТАТИСТИКА ====================
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("📊 Всего строк", st.session_state.total_rows)
@@ -91,7 +114,7 @@ with tab1:
         deleted = st.session_state.deleted_rows if st.session_state.is_cleaned else 0
         st.metric("🗑️ Удалено строк", deleted)
     
-    # ==================== ИНДИКАТОР ТЕКУЩЕГО ФАЙЛА ====================
+    # ==================== ИНДИКАТОР ФАЙЛА ====================
     if st.session_state.original_df is not None and uploaded_file is not None:
         st.caption(f"📄 Текущий файл: **{uploaded_file.name}** ({st.session_state.total_rows} строк)")
     
@@ -111,11 +134,9 @@ with tab1:
             label_visibility="collapsed"
         )
         
-        # Сохраняем в uploaded_files
         if zp_file is not None:
             st.session_state.uploaded_files['zp_shtrafy'] = zp_file
         
-        # Статус (опционально, для UX)
         if st.session_state.zp_shtrafy_df is not None:
             st.success(f"✅ Загружено: {len(st.session_state.zp_shtrafy_df)} записей")
             if st.session_state.zp_shtrafy_time:
@@ -157,73 +178,23 @@ with tab1:
     
     st.markdown("---")
     
-    # ==================== КНОПКА СБРОСА (КАК В ПФ) ====================
+    # ==================== КНОПКА СБРОСА ====================
     if st.button("🗑️ Сбросить все данные", use_container_width=True):
-        # 1. Очищаем кэш загрузки
         clear_cache()
-        
-        # 2. Сбрасываем все переменные session_state
         for key in list(DEFAULT_STATE.keys()):
             st.session_state[key] = DEFAULT_STATE[key]
-        
         st.success("✅ Все данные и кэш очищены")
         st.rerun()
     
     st.markdown("---")
     
     # ==================== КНОПКА ЗАПУСКА ====================
-    # Проверяем наличие основного файла в uploaded_files
-    main_file_exists = 'main_file' in st.session_state.uploaded_files
-    
-    if main_file_exists:
+    if st.session_state.original_df is not None:
         if st.button("🚀 Запустить расчет", type="primary", use_container_width=True):
             with st.spinner("Выполняется расчет..."):
                 try:
-                    # 1. Очищаем uploaded_files перед расчетом (как в ПФ)
-                    # st.session_state.uploaded_files = {}
+                    df = st.session_state.original_df
                     
-                    # 2. Читаем файлы из uploaded_files (как в ПФ)
-                    main_file = st.session_state.uploaded_files.get('main_file')
-                    zp_file = st.session_state.uploaded_files.get('zp_shtrafy')
-                    projects_file = st.session_state.uploaded_files.get('projects_outside_checker')
-                    hvosty_file = st.session_state.uploaded_files.get('hvosty')
-                    
-                    # 3. Загружаем данные
-                    df, error = load_excel(main_file, "main_file")
-                    if error:
-                        st.error(f"❌ {error}")
-                        st.stop()
-                    
-                    # Проверяем колонки
-                    is_valid, error_msg, _ = validate_columns(df)
-                    if not is_valid:
-                        st.error(f"❌ {error_msg}")
-                        st.session_state.columns_valid = False
-                        st.stop()
-                    else:
-                        st.session_state.columns_valid = True
-                    
-                    st.session_state.original_df = df
-                    st.session_state.total_rows = len(df)
-                    st.session_state.is_cleaned = False
-                    
-                    # Загружаем справочники (если есть)
-                    if zp_file is not None:
-                        df_shtrafy, _ = load_excel(zp_file, "zp_shtrafy")
-                        st.session_state.zp_shtrafy_df = df_shtrafy
-                        st.session_state.zp_shtrafy_time = datetime.now().strftime("%d.%m.%Y %H:%M")
-                    
-                    if projects_file is not None:
-                        df_projects, _ = load_excel(projects_file, "projects_outside_checker")
-                        st.session_state.projects_outside_checker_df = df_projects
-                        st.session_state.projects_outside_checker_time = datetime.now().strftime("%d.%m.%Y %H:%M")
-                    
-                    if hvosty_file is not None:
-                        df_hvosty, _ = load_excel(hvosty_file, "hvosty")
-                        st.session_state.hvosty_df = df_hvosty
-                        st.session_state.hvosty_time = datetime.now().strftime("%d.%m.%Y %H:%M")
-                    
-                    # ============ РАСЧЕТ ============
                     progress_bar = st.progress(0, text="Начинаем расчет...")
                     
                     progress_bar.progress(10, text="Очистка данных...")
@@ -237,6 +208,68 @@ with tab1:
                             st.session_state.name_login_df
                         )
                     
+                    # ==================== ДИАГНОСТИКА ====================
+                    st.subheader("🔍 Диагностика обогащения RS для koordinator52")
+                    
+                    if 'Логин RS' in cleaned_df.columns and 'RS' in cleaned_df.columns:
+                        mask = cleaned_df['Логин RS'].astype(str).str.lower().str.strip() == 'koordinator52'
+                        if mask.any():
+                            row = cleaned_df[mask].iloc[0]
+                            st.success("✅ Найдена строка с Логин RS = koordinator52")
+                            
+                            login_rs = str(row['Логин RS']).strip()
+                            st.write(f"1. Логин RS = '{login_rs}' → {'✅ ЗАПОЛНЕН' if login_rs else '❌ ПУСТОЙ'}")
+                            
+                            rs_value = str(row['RS']).strip()
+                            st.write(f"2. Текущее значение RS = '{rs_value}'")
+                            
+                            is_empty = rs_value == ''
+                            is_dash = rs_value == '-'
+                            is_zero = rs_value == '0'
+                            has_koordinator = 'koordinator' in rs_value.lower()
+                            has_rukovoditel = 'rukovoditel' in rs_value.lower()
+                            
+                            st.write("3. Условия для замены RS:")
+                            st.write(f"   - RS пустая: {is_empty} {'✅' if is_empty else '❌'}")
+                            st.write(f"   - RS = '-': {is_dash} {'✅' if is_dash else '❌'}")
+                            st.write(f"   - RS = '0': {is_zero} {'✅' if is_zero else '❌'}")
+                            st.write(f"   - RS содержит 'koordinator': {has_koordinator} {'✅' if has_koordinator else '❌'}")
+                            st.write(f"   - RS содержит 'rukovoditel': {has_rukovoditel} {'✅' if has_rukovoditel else '❌'}")
+                            st.write(f"   → ИТОГ: {'✅ УСЛОВИЕ ВЫПОЛНЯЕТСЯ' if (is_empty or is_dash or is_zero or has_koordinator or has_rukovoditel) else '❌ УСЛОВИЕ НЕ ВЫПОЛНЯЕТСЯ'}")
+                            
+                            name_login_df = st.session_state.get('name_login_df')
+                            if name_login_df is not None and not name_login_df.empty:
+                                if 'логин эм' in name_login_df.columns:
+                                    name_login_lower = name_login_df['логин эм'].astype(str).str.lower().str.strip()
+                                    found = (name_login_lower == 'koordinator52').any()
+                                    st.write(f"4. koordinator52 найден в справочнике 'Имя-логин': {'✅ ДА' if found else '❌ НЕТ'}")
+                                    if found:
+                                        full_name = name_login_df[name_login_lower == 'koordinator52']['ЭМ'].iloc[0]
+                                        st.write(f"   → Найдено имя: '{full_name}'")
+                                else:
+                                    st.write("4. ❌ В справочнике 'Имя-логин' нет колонки 'логин эм'")
+                            else:
+                                st.write("4. ❌ Справочник 'Имя-логин' НЕ ЗАГРУЖЕН или ПУСТОЙ")
+                            
+                            final_rs = str(row['RS']).strip()
+                            st.write(f"5. Значение RS в финальном отчете = '{final_rs}'")
+                            if final_rs == 'Мария Павловна Троян':
+                                st.success("✅ RS успешно заменена на 'Мария Павловна Троян'")
+                            else:
+                                st.warning(f"⚠️ RS НЕ заменена. Текущее значение: '{final_rs}'")
+                            
+                            st.write(f"6. Колонка 'RS' присутствует в DataFrame: {'✅ ДА' if 'RS' in cleaned_df.columns else '❌ НЕТ'}")
+                            
+                            with st.expander("📋 Все данные строки с koordinator52"):
+                                row_df = pd.DataFrame([row]).T
+                                row_df.columns = ['Значение']
+                                st.dataframe(row_df, use_container_width=True)
+                        else:
+                            st.warning("⚠️ Строка с Логин RS = koordinator52 НЕ НАЙДЕНА")
+                    else:
+                        st.error("❌ Колонки 'Логин RS' или 'RS' отсутствуют в DataFrame")
+                    
+                    # ==================== ОСТАЛЬНЫЕ РАСЧЕТЫ ====================
                     progress_bar.progress(35, text="Заполнение Проектная мотивация...")
                     project_motivation_data = load_from_json_github('project_motivation')
                     if project_motivation_data is not None:
@@ -325,6 +358,7 @@ with tab1:
 
 # ==================== ВКЛАДКА 2: НАСТРОЙКИ ====================
 with tab2:
+    # ... (код без изменений, как в предыдущей версии)
     st.markdown("---")
     st.subheader("⚙️ Настройки справочников")
     
