@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 
-from data_loader import load_excel, validate_columns
+from data_loader import load_excel, validate_columns, clear_cache
 from data_cleaner import (
     clean_data,
     fill_rs_and_em,
@@ -32,32 +32,24 @@ st.set_page_config(
 st.title("💰 Расчет ЗП")
 
 # ==================== ИНИЦИАЛИЗАЦИЯ СЕССИИ ====================
-if 'cleaned_excel' not in st.session_state:
-    st.session_state.cleaned_excel = None
-if 'deleted_excel' not in st.session_state:
-    st.session_state.deleted_excel = None
-if 'is_cleaned' not in st.session_state:
-    st.session_state.is_cleaned = False
-if 'original_df' not in st.session_state:
-    st.session_state.original_df = None
-if 'total_rows' not in st.session_state:
-    st.session_state.total_rows = 0
-if 'cleaned_rows' not in st.session_state:
-    st.session_state.cleaned_rows = 0
-if 'deleted_rows' not in st.session_state:
-    st.session_state.deleted_rows = 0
-if 'columns_valid' not in st.session_state:
-    st.session_state.columns_valid = False
+DEFAULT_STATE = {
+    'cleaned_excel': None,
+    'deleted_excel': None,
+    'is_cleaned': False,
+    'original_df': None,
+    'total_rows': 0,
+    'cleaned_rows': 0,
+    'deleted_rows': 0,
+    'columns_valid': False,
+    'zp_shtrafy_df': None,
+    'projects_outside_checker_df': None,
+    'hvosty_df': None,
+    'name_login_df': None
+}
 
-# Для дополнительных справочников
-if 'zp_shtrafy_df' not in st.session_state:
-    st.session_state.zp_shtrafy_df = None
-if 'projects_outside_checker_df' not in st.session_state:
-    st.session_state.projects_outside_checker_df = None
-if 'hvosty_df' not in st.session_state:
-    st.session_state.hvosty_df = None
-if 'name_login_df' not in st.session_state:
-    st.session_state.name_login_df = None
+for key, default_value in DEFAULT_STATE.items():
+    if key not in st.session_state:
+        st.session_state[key] = default_value
 
 # ==================== ЗАГРУЗКА СПРАВОЧНИКОВ ИЗ GITHUB ====================
 # Загружаем справочник "Имя-логин" из GitHub при старте
@@ -173,37 +165,17 @@ with tab1:
         
         st.markdown("---")
         
-        # ==================== КНОПКИ СБРОСА ====================
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("🗑️ Сбросить массив", use_container_width=True):
-                st.session_state.original_df = None
-                st.session_state.total_rows = 0
-                st.session_state.is_cleaned = False
-                st.session_state.cleaned_excel = None
-                st.session_state.deleted_excel = None
-                st.session_state.cleaned_rows = 0
-                st.session_state.deleted_rows = 0
-                st.session_state.columns_valid = False
-                st.toast("✅ Массив сброшен", icon="🗑️")
-                st.rerun()
-        
-        with col2:
-            if st.button("🗑️ Сбросить всё", use_container_width=True):
-                st.session_state.original_df = None
-                st.session_state.total_rows = 0
-                st.session_state.is_cleaned = False
-                st.session_state.cleaned_excel = None
-                st.session_state.deleted_excel = None
-                st.session_state.cleaned_rows = 0
-                st.session_state.deleted_rows = 0
-                st.session_state.columns_valid = False
-                st.session_state.zp_shtrafy_df = None
-                st.session_state.projects_outside_checker_df = None
-                st.session_state.hvosty_df = None
-                st.toast("✅ Все данные сброшены", icon="🗑️")
-                st.rerun()
+        # ==================== КНОПКА СБРОСА (как в другом сервисе) ====================
+        if st.button("🗑️ Сбросить все данные", use_container_width=True):
+            # 1. Очищаем кэш загрузки
+            clear_cache()
+            
+            # 2. Сбрасываем все переменные session_state
+            for key in list(DEFAULT_STATE.keys()):
+                st.session_state[key] = DEFAULT_STATE[key]
+            
+            st.success("✅ Все данные и кэш очищены")
+            st.rerun()
         
         st.markdown("---")
         
