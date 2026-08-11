@@ -227,46 +227,104 @@ with tab1:
                             st.session_state.name_login_df
                         )
                     
-                    # 🔍 ПОШАГОВАЯ ДИАГНОСТИКА
-                    st.subheader("🔍 ПОШАГОВАЯ ДИАГНОСТИКА fill_rs_and_em()")
+                    # ==================== ДИАГНОСТИКА ====================
+                    st.subheader("🔍 ДИАГНОСТИКА")
                     
-                    if 'Логин RS' in cleaned_df.columns:
-                        mask_final = cleaned_df['Логин RS'].astype(str).str.lower().str.strip() == 'Rukovoditel2'
-                        if mask_final.any():
-                            st.success("✅ ПОСЛЕ ВСЕХ ШАГОВ: найдена строка с Rukovoditel2")
-                            row = cleaned_df[mask_final].iloc[0]
-                            st.write(f"   RS = '{row['RS']}'")
+                    if 'Логин RS' in cleaned_df.columns and 'RS' in cleaned_df.columns:
+                        mask = cleaned_df['Логин RS'].astype(str).str.lower().str.strip() == 'rukovoditel2'
+                        
+                        if mask.any():
+                            st.success("✅ Найдена строка с Логин RS = Rukovoditel2")
+                            row = cleaned_df[mask].iloc[0]
+                            
+                            login_rs = str(row['Логин RS']).strip()
+                            st.write(f"**1. Логин RS** = '{login_rs}' → {'✅ ЗАПОЛНЕН' if login_rs else '❌ ПУСТОЙ'}")
+                            
+                            rs_value = str(row['RS']).strip()
+                            st.write(f"**2. Текущее RS** = '{rs_value}'")
+                            
+                            is_empty = rs_value == ''
+                            is_dash = rs_value == '-'
+                            is_zero = rs_value == '0'
+                            is_nan = rs_value == 'nan'
+                            has_koordinator = 'koordinator' in rs_value.lower()
+                            has_rukovoditel = 'rukovoditel' in rs_value.lower()
+                            
+                            st.write("**3. Условия для замены RS:**")
+                            st.write(f"   - RS пустая: {is_empty} {'✅' if is_empty else '❌'}")
+                            st.write(f"   - RS = '-': {is_dash} {'✅' if is_dash else '❌'}")
+                            st.write(f"   - RS = '0': {is_zero} {'✅' if is_zero else '❌'}")
+                            st.write(f"   - RS = 'nan': {is_nan} {'✅' if is_nan else '❌'}")
+                            st.write(f"   - RS содержит 'koordinator': {has_koordinator} {'✅' if has_koordinator else '❌'}")
+                            st.write(f"   - RS содержит 'rukovoditel': {has_rukovoditel} {'✅' if has_rukovoditel else '❌'}")
+                            
+                            condition_met = is_empty or is_dash or is_zero or is_nan or has_koordinator or has_rukovoditel
+                            st.write(f"   → **ИТОГ:** {'✅ УСЛОВИЕ ВЫПОЛНЯЕТСЯ' if condition_met else '❌ УСЛОВИЕ НЕ ВЫПОЛНЯЕТСЯ'}")
+                            
+                            name_login_df = st.session_state.get('name_login_df')
+                            if name_login_df is not None and not name_login_df.empty:
+                                if 'логин эм' in name_login_df.columns:
+                                    name_login_lower = name_login_df['логин эм'].astype(str).str.lower().str.strip()
+                                    found = (name_login_lower == 'rukovoditel2').any()
+                                    st.write(f"**4. Rukovoditel2 в справочнике 'Имя-логин':** {'✅ НАЙДЕН' if found else '❌ НЕ НАЙДЕН'}")
+                                    if found:
+                                        full_name = name_login_df[name_login_lower == 'rukovoditel2']['ЭМ'].iloc[0]
+                                        st.write(f"   → Найдено имя: '{full_name}'")
+                                        
+                                        login_to_name_check = {}
+                                        for _, r in name_login_df.iterrows():
+                                            login = str(r['логин эм']).strip()
+                                            name = str(r['ЭМ']).strip()
+                                            login_to_name_check[login] = name
+                                        
+                                        original_found = login_rs in login_to_name_check
+                                        st.write(f"   - login_rs '{login_rs}' in login_to_name: {'✅ ДА' if original_found else '❌ НЕТ'}")
+                                        
+                                        lower_found = login_rs.lower() in login_to_name_check
+                                        st.write(f"   - login_rs.lower() '{login_rs.lower()}' in login_to_name: {'✅ ДА' if lower_found else '❌ НЕТ'}")
+                                        
+                                        similar_keys = [k for k in login_to_name_check.keys() if 'rukovoditel' in k.lower()]
+                                        st.write(f"   - Ключи с 'rukovoditel': {similar_keys}")
+                                else:
+                                    st.write("**4.** ❌ В справочнике 'Имя-логин' нет колонки 'логин эм'")
+                            else:
+                                st.write("**4.** ❌ Справочник 'Имя-логин' НЕ ЗАГРУЖЕН или ПУСТОЙ")
+                            
+                            projects_df = st.session_state.get('projects_outside_checker_df')
+                            if projects_df is not None and not projects_df.empty:
+                                if 'логин ЭМ кто назначил' in projects_df.columns:
+                                    projects_lower = projects_df['логин ЭМ кто назначил'].astype(str).str.lower().str.strip()
+                                    found_in_projects = (projects_lower == 'rukovoditel2').any()
+                                    st.write(f"**5. Rukovoditel2 в 'Проекты вне чеккера':** {'✅ НАЙДЕН' if found_in_projects else '❌ НЕ НАЙДЕН'}")
+                                    if found_in_projects:
+                                        matched_rows = projects_df[projects_lower == 'rukovoditel2']
+                                        st.write(f"   → Найдено {len(matched_rows)} записей")
+                                        cols_to_show = [c for c in ['номер локации', 'Код проекта', 'логин ЭМ кто назначил'] if c in matched_rows.columns]
+                                        if cols_to_show:
+                                            st.dataframe(matched_rows[cols_to_show], use_container_width=True)
+                                else:
+                                    st.write("**5.** ❌ В справочнике нет колонки 'логин ЭМ кто назначил'")
+                            else:
+                                st.write("**5.** ❌ Справочник 'Проекты вне чеккера' НЕ ЗАГРУЖЕН или ПУСТОЙ")
+                            
+                            st.write(f"**6. BranchID** = '{row.get('BranchID', 'НЕТ КОЛОНКИ')}'")
+                            st.write(f"**   SetCode** = '{row.get('SetCode', 'НЕТ КОЛОНКИ')}'")
+                            
+                            final_rs = str(row['RS']).strip()
+                            st.write(f"**7. Финальное RS** = '{final_rs}'")
+                            if final_rs and final_rs != '' and final_rs != 'nan':
+                                st.success(f"✅ RS заполнена: '{final_rs}'")
+                            else:
+                                st.warning(f"⚠️ RS НЕ заполнена")
+                            
+                            with st.expander("📋 Все данные строки"):
+                                row_df = pd.DataFrame([row]).T
+                                row_df.columns = ['Значение']
+                                st.dataframe(row_df, use_container_width=True)
                         else:
-                            st.warning("❌ ПОСЛЕ ВСЕХ ШАГОВ: строка с Rukovoditel2 НЕ НАЙДЕНА")
+                            st.warning("⚠️ Строка с Логин RS = Rukovoditel2 НЕ НАЙДЕНА")
                     else:
-                        st.error("❌ Колонка 'Логин RS' отсутствует")
-                    
-                    st.write(f"\n**1. Справочник 'Проекты вне чеккера':**")
-                    if st.session_state.projects_outside_checker_df is not None:
-                        st.success(f"✅ ЗАГРУЖЕН В session_state ({len(st.session_state.projects_outside_checker_df)} записей)")
-                    else:
-                        st.error("❌ НЕ ЗАГРУЖЕН В session_state")
-                    
-                    st.write(f"   Проверка uploaded_files:")
-                    if 'projects_outside_checker' in st.session_state.uploaded_files:
-                        st.success("✅ Файл есть в uploaded_files")
-                    else:
-                        st.error("❌ Файла нет в uploaded_files")
-                    
-                    st.write(f"\n**2. Справочник 'Имя-логин':**")
-                    if st.session_state.name_login_df is not None:
-                        st.success(f"✅ ЗАГРУЖЕН ({len(st.session_state.name_login_df)} записей)")
-                        st.write(f"   Колонки: {list(st.session_state.name_login_df.columns)}")
-                    else:
-                        st.error("❌ НЕ ЗАГРУЖЕН")
-                    
-                    if 'Логин RS' in cleaned_df.columns:
-                        mask_step1 = cleaned_df['Логин RS'].astype(str).str.lower().str.strip() == 'Rukovoditel2'
-                        st.write(f"\n**3. Rukovoditel2 в Логин RS:**")
-                        if mask_step1.any():
-                            st.success("✅ НАЙДЕН")
-                        else:
-                            st.warning("❌ НЕ НАЙДЕН")
+                        st.error("❌ Колонки 'Логин RS' или 'RS' отсутствуют")
                     
                     # ============================================================
                     # 3. ОСТАЛЬНЫЕ РАСЧЕТЫ
