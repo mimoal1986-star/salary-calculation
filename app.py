@@ -79,44 +79,26 @@ with tab1:
         key="main_file"
     )
     
-    # ==================== СБРОС ПРИ ОТСУТСТВИИ ФАЙЛА ====================
-    # Если файл не загружен, но в сессии есть данные → сбрасываем
-    if uploaded_file is None and st.session_state.original_df is not None:
-        st.session_state.original_df = None
-        st.session_state.is_cleaned = False
-        st.session_state.cleaned_excel = None
-        st.session_state.deleted_excel = None
-        st.session_state.cleaned_rows = 0
-        st.session_state.deleted_rows = 0
-        st.session_state.columns_valid = False
-    
     if uploaded_file is not None:
-        # Сбрасываем старые данные при загрузке нового файла
-        st.session_state.original_df = None
-        st.session_state.is_cleaned = False
-        st.session_state.cleaned_excel = None
-        st.session_state.deleted_excel = None
-        st.session_state.cleaned_rows = 0
-        st.session_state.deleted_rows = 0
-        st.session_state.columns_valid = False
-        
-        with st.spinner("Загрузка файла..."):
-            df, error = load_excel(uploaded_file)
-            if error:
-                st.error(f"❌ {error}")
-                st.stop()
-            
-            is_valid, error_msg, _ = validate_columns(df)
-            if not is_valid:
-                st.error(f"❌ {error_msg}")
-                st.session_state.columns_valid = False
-                st.stop()
-            else:
-                st.session_state.columns_valid = True
-            
-            st.session_state.original_df = df
-            st.session_state.total_rows = len(df)
-            st.session_state.is_cleaned = False
+        # Загружаем файл (только один раз)
+        if st.session_state.original_df is None:
+            with st.spinner("Загрузка файла..."):
+                df, error = load_excel(uploaded_file)
+                if error:
+                    st.error(f"❌ {error}")
+                    st.stop()
+                
+                is_valid, error_msg, _ = validate_columns(df)
+                if not is_valid:
+                    st.error(f"❌ {error_msg}")
+                    st.session_state.columns_valid = False
+                    st.stop()
+                else:
+                    st.session_state.columns_valid = True
+                
+                st.session_state.original_df = df
+                st.session_state.total_rows = len(df)
+                st.session_state.is_cleaned = False
         
         df = st.session_state.original_df
         
@@ -146,13 +128,6 @@ with tab1:
                 key="zp_shtrafy",
                 label_visibility="collapsed"
             )
-            
-            # Показываем статус, даже если файл не загружен сейчас
-            if st.session_state.zp_shtrafy_df is not None:
-                st.success(f"✅ Загружено: {len(st.session_state.zp_shtrafy_df)} записей")
-            elif zp_file is None:
-                st.info("📎 Файл не загружен")
-            
             if zp_file is not None:
                 with st.spinner("Загрузка ЗП_штрафы..."):
                     try:
@@ -170,12 +145,6 @@ with tab1:
                 key="projects_outside_checker",
                 label_visibility="collapsed"
             )
-            
-            if st.session_state.projects_outside_checker_df is not None:
-                st.success(f"✅ Загружено: {len(st.session_state.projects_outside_checker_df)} записей")
-            elif projects_file is None:
-                st.info("📎 Файл не загружен")
-            
             if projects_file is not None:
                 with st.spinner("Загрузка Проекты вне чеккера..."):
                     try:
@@ -193,12 +162,6 @@ with tab1:
                 key="hvosty",
                 label_visibility="collapsed"
             )
-            
-            if st.session_state.hvosty_df is not None:
-                st.success(f"✅ Загружено: {len(st.session_state.hvosty_df)} записей")
-            elif hvosty_file is None:
-                st.info("📎 Файл не загружен")
-            
             if hvosty_file is not None:
                 with st.spinner("Загрузка Хвосты..."):
                     try:
@@ -207,6 +170,40 @@ with tab1:
                         st.toast(f"✅ Загружено {len(df_hvosty)} записей", icon="✅")
                     except Exception as e:
                         st.toast(f"❌ Ошибка: {str(e)}", icon="❌")
+        
+        st.markdown("---")
+        
+        # ==================== КНОПКИ СБРОСА ====================
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("🗑️ Сбросить массив", use_container_width=True):
+                st.session_state.original_df = None
+                st.session_state.total_rows = 0
+                st.session_state.is_cleaned = False
+                st.session_state.cleaned_excel = None
+                st.session_state.deleted_excel = None
+                st.session_state.cleaned_rows = 0
+                st.session_state.deleted_rows = 0
+                st.session_state.columns_valid = False
+                st.toast("✅ Массив сброшен", icon="🗑️")
+                st.rerun()
+        
+        with col2:
+            if st.button("🗑️ Сбросить всё", use_container_width=True):
+                st.session_state.original_df = None
+                st.session_state.total_rows = 0
+                st.session_state.is_cleaned = False
+                st.session_state.cleaned_excel = None
+                st.session_state.deleted_excel = None
+                st.session_state.cleaned_rows = 0
+                st.session_state.deleted_rows = 0
+                st.session_state.columns_valid = False
+                st.session_state.zp_shtrafy_df = None
+                st.session_state.projects_outside_checker_df = None
+                st.session_state.hvosty_df = None
+                st.toast("✅ Все данные сброшены", icon="🗑️")
+                st.rerun()
         
         st.markdown("---")
         
