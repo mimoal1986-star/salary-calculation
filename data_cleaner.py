@@ -267,16 +267,6 @@ def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
         def get_rs(row):
             rs_value = str(row['RS']).strip()
             login_rs = str(row['Логин RS']).strip()
-
-            # === ОТЛАДКА ===
-            if login_rs == 'koordinator52':
-                print(f"\n🔍 НАЙДЕНА СТРОКА С koordinator52")
-                print(f"   rs_value = '{rs_value}'")
-                print(f"   login_rs = '{login_rs}'")
-                print(f"   login_to_name keys: {list(login_to_name.keys()) if login_to_name else 'СЛОВАРЬ ПУСТ!'}")
-                print(f"   login_rs in login_to_name: {login_rs in login_to_name}")
-                if login_rs in login_to_name:
-                    print(f"   Найденное имя: {login_to_name[login_rs]}")
             
             if rs_value == '' or rs_value == '-' or rs_value == '0' or 'koordinator' in rs_value.lower() or 'rukovoditel' in rs_value.lower():
                 if login_rs.lower() in login_to_name:
