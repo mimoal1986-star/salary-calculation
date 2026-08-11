@@ -268,14 +268,12 @@ def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
             rs_value = str(row['RS']).strip()
             login_rs = str(row['Логин RS']).strip()
             
-            # Проверяем, что RS пустая или содержит - / 0 / koordinator / rukovoditel
             if rs_value == '' or rs_value == '-' or rs_value == '0' or 'koordinator' in rs_value.lower() or 'rukovoditel' in rs_value.lower():
-                # Ищем в словаре по логин rs
-                if login_rs in login_to_name:
-                    return login_to_name[login_rs]
+                if login_rs.lower() in login_to_name:
+                    return login_to_name[login_rs.lower()]
             
             return row['RS']
-        
+    
         df['RS'] = df.apply(get_rs, axis=1)
     
     return df
