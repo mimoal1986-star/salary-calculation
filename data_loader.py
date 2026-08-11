@@ -20,9 +20,10 @@ REQUIRED_COLUMNS = [
 ]
 
 
+@st.cache_data
 def load_excel(file):
     """
-    Загружает Excel-файл в DataFrame
+    Загружает Excel-файл в DataFrame с кэшированием
     
     Args:
         file: загруженный файл из st.file_uploader
