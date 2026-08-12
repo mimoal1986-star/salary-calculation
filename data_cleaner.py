@@ -4,7 +4,7 @@
 """
 
 import pandas as pd
-from utils import normalize_text
+from utils import normalize_text, is_empty_value
 
 # Разрешенные менеджеры (проверяем по колонке ACC)
 ALLOWED_MANAGERS = [
@@ -239,7 +239,7 @@ def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
             login_rs = str(row['Логин RS']).strip()
             rs_value = str(row['RS']).strip()
             
-            if login_rs == '' and rs_value != '':
+            if is_empty_value(login_rs) and not is_empty_value(rs_value):
                 if rs_value in name_to_login:
                     return name_to_login[rs_value]
             
@@ -252,47 +252,13 @@ def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
             rs_value = str(row['RS']).strip()
             login_rs = str(row['Логин RS']).strip()
             
-            if rs_value == '' or rs_value == '-' or rs_value == '0' or rs_value == 'nan' or 'koordinator' in rs_value.lower() or 'rukovoditel' in rs_value.lower():
+            if is_empty_value(rs_value) or 'koordinator' in rs_value.lower() or 'rukovoditel' in rs_value.lower():
                 if login_rs.lower() in login_to_name:
                     return login_to_name[login_rs.lower()]
             
             return row['RS']
     
         df['RS'] = df.apply(get_rs, axis=1)
-    
-    # ==================== ПОШАГОВАЯ ДИАГНОСТИКА ====================
-    print("\n" + "="*60)
-    print("🔍 ПОШАГОВАЯ ДИАГНОСТИКА fill_rs_and_em()")
-    print("="*60)
-    
-    # Ищем строку с koordinator52 в Логин RS (после всех шагов)
-    mask_final = df['Логин RS'].astype(str).str.lower().str.strip() == 'koordinator52'
-    if mask_final.any():
-        print(f"✅ ПОСЛЕ ВСЕХ ШАГОВ: найдена строка с koordinator52")
-        row = df[mask_final].iloc[0]
-        print(f"   RS = '{row['RS']}'")
-    else:
-        print(f"❌ ПОСЛЕ ВСЕХ ШАГОВ: строка с koordinator52 НЕ НАЙДЕНА")
-    
-    # Проверяем наличие справочников
-    print(f"\n1. Справочник 'Проекты вне чеккера': {'ЗАГРУЖЕН' if projects_df is not None else 'НЕ ЗАГРУЖЕН'}")
-    if projects_df is not None:
-        print(f"   - Количество записей: {len(projects_df)}")
-        print(f"   - Колонки: {list(projects_df.columns)}")
-    
-    print(f"\n2. Справочник 'Имя-логин': {'ЗАГРУЖЕН' if name_login_df is not None else 'НЕ ЗАГРУЖЕН'}")
-    if name_login_df is not None:
-        print(f"   - Количество записей: {len(name_login_df)}")
-        print(f"   - Колонки: {list(name_login_df.columns)}")
-    
-    # Проверяем, есть ли koordinator52 в Логин RS ПОСЛЕ ШАГА 1
-    if 'Логин RS' in df.columns:
-        mask_step1 = df['Логин RS'].astype(str).str.lower().str.strip() == 'koordinator52'
-        print(f"\n3. ПОСЛЕ ШАГА 1: {'✅ НАЙДЕНА' if mask_step1.any() else '❌ НЕ НАЙДЕНА'}")
-    else:
-        print(f"\n3. ПОСЛЕ ШАГА 1: колонка 'Логин RS' отсутствует")
-    
-    print("="*60 + "\n")
     
     return df
 
@@ -487,6 +453,7 @@ def fill_recruit_adjustments(cleaned_df, zp_shtrafy_df):
     
     return df
 
+
 def fill_login_rs_from_distribution(cleaned_df, distribution_data):
     """
     Заполняет Логин RS из справочника "Распределение"
@@ -518,11 +485,11 @@ def fill_login_rs_from_distribution(cleaned_df, distribution_data):
         client_name = str(row['ClientName']).strip().lower()
         
         # Если Логин RS уже заполнен — пропускаем
-        if login_rs and login_rs != '' and login_rs != 'nan':
+        if not is_empty_value(login_rs):
             return row['Логин RS']
         
         # Если RS пустая — не заполняем
-        if not rs_value or rs_value == '' or rs_value == 'nan':
+        if is_empty_value(rs_value):
             return row['Логин RS']
         
         # Определяем тип региона
@@ -548,7 +515,16 @@ def fill_login_rs_from_distribution(cleaned_df, distribution_data):
     
     return df
 
+
 def fill_rs_login_from_projects(cleaned_df, projects_df):
+    """
+    Заполняет Логин RS из справочника "Проекты вне чеккера"
+    по сцепке SetCode + Address
+    
+    Условие: RS пусто И Логин RS пусто
+    
+    Запускать ПОСЛЕ всех обогащений!
+    """
     df = cleaned_df.copy()
     
     if projects_df is None or projects_df.empty:
@@ -568,15 +544,18 @@ def fill_rs_login_from_projects(cleaned_df, projects_df):
         login_rs = str(row['Логин RS']).strip()
         rs_value = str(row['RS']).strip()
         
-        is_login_empty = login_rs == '' or login_rs == '-' or login_rs == '0' or login_rs == 'nan'
-        is_rs_empty = rs_value == '' or rs_value == '-' or rs_value == '0' or rs_value == 'nan'
+        is_login_empty = is_empty_value(login_rs)
+        is_rs_empty = is_empty_value(rs_value)
         
+        # Если оба не пустые — пропускаем
         if not is_login_empty and not is_rs_empty:
             return row
         
+        # Если Логин RS не пустой, но RS пустой — пропускаем (это кейс для другого обогащения)
         if not is_login_empty and is_rs_empty:
             return row
         
+        # Если оба пустые — ищем в справочнике
         if is_login_empty and is_rs_empty:
             set_code = str(row['SetCode']).strip()
             address = str(row['Address']).strip()
