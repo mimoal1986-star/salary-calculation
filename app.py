@@ -7,6 +7,7 @@ from data_loader import load_excel, validate_columns, clear_cache
 from data_cleaner import (
     clean_data,
     fill_rs_and_em,
+    fill_login_rs_from_distribution,
     fill_project_motivation,
     fill_region_type,
     fill_separate_motivation,
@@ -233,6 +234,11 @@ with tab1:
                             st.session_state.projects_outside_checker_df,
                             st.session_state.name_login_df
                         )
+
+                    progress_bar.progress(28, text="Дозаполнение Логин RS из Распределения...")
+                    distribution_data = load_from_json_github('distribution')
+                    if distribution_data is not None:
+                        cleaned_df = fill_login_rs_from_distribution(cleaned_df, distribution_data['data'])
                     
                     # # ============================================================
                     # # 4. ДИАГНОСТИКА
