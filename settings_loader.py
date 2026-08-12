@@ -203,131 +203,91 @@ def load_name_login(file):
 
 
 def load_distribution(file):
-    """
-    Загружает справочник Распределение
-    
-    Ожидаемая структура (3 таблицы горизонтально):
-    Таблица 1: ФИ ASM | регион | рег 2 | ФИ RS | логин RS | статус (RS/СТАЖЕР)
-    Таблица 2: распределение по Питеру | ФИ RS | логин RS | статус (RS/СТАЖЕР)
-    Таблица 3: Москва | ФИ RS | логин RS | статус (RS/СТАЖЕР)
-    
-    Returns:
-        dict: {
-            'region_mapping': {'регион': 'логин RS'},
-            'spb_mapping': {'распределение по Питеру': 'логин RS'},
-            'moscow_mapping': {'Москва': 'логин RS'}
-        }
-    """
     try:
-        df = pd.read_excel(file, engine='openpyxl', header=None)
+        df = pd.read_excel(file, engine='openpyxl')
         
+        if df.empty:
+            return {'status': 'error', 'message': "Файл пуст"}
+        
+        # ============ 1. Маппинг по регионам ============
         region_mapping = {}
-        spb_mapping = {}
-        moscow_mapping = {}
         
-        # ============ 1. Парсим таблицу Регионов ============
-        # Находим строку с заголовками "ФИ ASM" или "регион"
-        header_row_idx = None
-        for idx, row in df.iterrows():
-            row_str = row.astype(str).str.lower().str.strip().values
-            if any('фи asm' in str(val).lower() for val in row_str):
-                header_row_idx = idx
+        region_col = None
+        for col in df.columns:
+            if str(col).strip() == 'регион':
+                region_col = col
                 break
         
-        if header_row_idx is not None:
-            header_row = df.iloc[header_row_idx].astype(str).str.strip()
-            
-            col_region = None
-            col_login_rs = None
-            
-            # Ищем колонки в области первой таблицы (первые 10 колонок)
-            for idx in range(0, 10):
-                val = str(header_row.get(idx, '')).lower()
-                if 'регион' in val and 'рег 2' not in val and 'рег2' not in val:
-                    col_region = idx
-                if 'логин rs' in val:
-                    col_login_rs = idx
-            
-            if col_region is not None and col_login_rs is not None:
-                for idx in range(header_row_idx + 1, len(df)):
-                    region = str(df.iloc[idx, col_region]).strip()
-                    login = str(df.iloc[idx, col_login_rs]).strip()
-                    if region and region != 'nan' and login and login != 'nan':
+        login_col = None
+        for col in df.columns:
+            if str(col).strip() == 'логин RS':
+                login_col = col
+                break
+        
+        if region_col is not None and login_col is not None:
+            for _, row in df.iterrows():
+                region = str(row[region_col]).strip()
+                login = str(row[login_col]).strip()
+                
+                if region and region not in ['nan', 'None', '']:
+                    if login and login not in ['nan', 'None', '']:
                         region_mapping[region] = login
         
-        # ============ 2. Парсим таблицу СПб ============
-        # Ищем строку с "распределение по питеру"
-        header_row_idx_spb = None
-        for idx, row in df.iterrows():
-            row_str = row.astype(str).str.lower().str.strip().values
-            if any('распределение по питеру' in str(val).lower() for val in row_str):
-                header_row_idx_spb = idx
+        # ============ 2. Маппинг по Москве ============
+        moscow_mapping = {}
+        moscow_client_col = None
+        moscow_login_col = None
+        
+        for col in df.columns:
+            if str(col).strip() == 'Москва':
+                moscow_client_col = col
                 break
         
-        if header_row_idx_spb is not None:
-            header_row_spb = df.iloc[header_row_idx_spb].astype(str).str.strip()
-            
-            col_client = None
-            col_login = None
-            
-            # Находим колонку, где находится заголовок "распределение по питеру"
-            start_col_spb = 0
-            for idx, val in header_row_spb.items():
-                if 'распределение по питеру' in str(val).lower():
-                    start_col_spb = idx
+        if moscow_client_col is not None:
+            for col in df.columns:
+                if str(col).strip() == 'логин RS' and col != login_col:
+                    moscow_login_col = col
                     break
             
-            # Ищем колонки в области таблицы СПб (начиная с найденной колонки)
-            for idx in range(start_col_spb, start_col_spb + 10):
-                val = str(header_row_spb.get(idx, '')).lower()
-                if 'распределение по питеру' in val:
-                    col_client = idx
-                if 'логин rs' in val:
-                    col_login = idx
-            
-            if col_client is not None and col_login is not None:
-                for idx in range(header_row_idx_spb + 1, len(df)):
-                    client = str(df.iloc[idx, col_client]).strip()
-                    login = str(df.iloc[idx, col_login]).strip()
-                    if client and client != 'nan' and login and login != 'nan':
-                        spb_mapping[client] = login
+            if moscow_login_col is None:
+                moscow_login_col = login_col
         
-        # ============ 3. Парсим таблицу Москва ============
-        # Ищем строку с "Москва"
-        header_row_idx_msk = None
-        for idx, row in df.iterrows():
-            row_str = row.astype(str).str.lower().str.strip().values
-            if any('москва' in str(val).lower() for val in row_str):
-                header_row_idx_msk = idx
-                break
-        
-        if header_row_idx_msk is not None:
-            header_row_msk = df.iloc[header_row_idx_msk].astype(str).str.strip()
-            
-            col_client = None
-            col_login = None
-            
-            # Находим колонку, где находится заголовок "Москва"
-            start_col_msk = 0
-            for idx, val in header_row_msk.items():
-                if 'москва' in str(val).lower():
-                    start_col_msk = idx
-                    break
-            
-            # Ищем колонки в области таблицы Москва (начиная с найденной колонки)
-            for idx in range(start_col_msk, start_col_msk + 10):
-                val = str(header_row_msk.get(idx, '')).lower()
-                if 'москва' in val:
-                    col_client = idx
-                if 'логин rs' in val:
-                    col_login = idx
-            
-            if col_client is not None and col_login is not None:
-                for idx in range(header_row_idx_msk + 1, len(df)):
-                    client = str(df.iloc[idx, col_client]).strip()
-                    login = str(df.iloc[idx, col_login]).strip()
-                    if client and client != 'nan' and login and login != 'nan':
+        if moscow_client_col is not None and moscow_login_col is not None:
+            for _, row in df.iterrows():
+                client = str(row[moscow_client_col]).strip()
+                login = str(row[moscow_login_col]).strip()
+                
+                if client and client not in ['nan', 'None', '']:
+                    if login and login not in ['nan', 'None', '']:
                         moscow_mapping[client] = login
+        
+        # ============ 3. Маппинг по Санкт-Петербургу ============
+        spb_mapping = {}
+        spb_client_col = None
+        spb_login_col = None
+        
+        for col in df.columns:
+            if str(col).strip() == 'распределение по Питеру':
+                spb_client_col = col
+                break
+        
+        if spb_client_col is not None:
+            for col in df.columns:
+                if str(col).strip() == 'логин RS' and col != login_col and col != moscow_login_col:
+                    spb_login_col = col
+                    break
+            
+            if spb_login_col is None:
+                spb_login_col = login_col
+        
+        if spb_client_col is not None and spb_login_col is not None:
+            for _, row in df.iterrows():
+                client = str(row[spb_client_col]).strip()
+                login = str(row[spb_login_col]).strip()
+                
+                if client and client not in ['nan', 'None', '']:
+                    if login and login not in ['nan', 'None', '']:
+                        spb_mapping[client] = login
         
         return {
             'status': 'success',
