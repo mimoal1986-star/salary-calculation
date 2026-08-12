@@ -547,3 +547,47 @@ def fill_login_rs_from_distribution(cleaned_df, distribution_data):
     df['Логин RS'] = df.apply(get_login_rs, axis=1)
     
     return df
+
+def fill_rs_login_from_projects(cleaned_df, projects_df):
+    df = cleaned_df.copy()
+    
+    if projects_df is None or projects_df.empty:
+        return df
+    
+    project_dict = {}
+    for _, row in projects_df.iterrows():
+        code = str(row['Код проекта']).strip()
+        address = str(row['адрес']).strip()
+        login = str(row['логин ЭМ кто назначил']).strip()
+        
+        if code and address and login:
+            key = (code, address)
+            project_dict[key] = login
+    
+    def fill_row(row):
+        login_rs = str(row['Логин RS']).strip()
+        rs_value = str(row['RS']).strip()
+        
+        is_login_empty = login_rs == '' or login_rs == '-' or login_rs == '0' or login_rs == 'nan'
+        is_rs_empty = rs_value == '' or rs_value == '-' or rs_value == '0' or rs_value == 'nan'
+        
+        if not is_login_empty and not is_rs_empty:
+            return row
+        
+        if not is_login_empty and is_rs_empty:
+            return row
+        
+        if is_login_empty and is_rs_empty:
+            set_code = str(row['SetCode']).strip()
+            address = str(row['Address']).strip()
+            
+            key = (set_code, address)
+            if key in project_dict:
+                login = project_dict[key]
+                row['Логин RS'] = login
+        
+        return row
+    
+    df = df.apply(fill_row, axis=1)
+    
+    return df
