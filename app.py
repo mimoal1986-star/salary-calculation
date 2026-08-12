@@ -255,7 +255,7 @@ with tab1:
                         projects_df = st.session_state.projects_outside_checker_df
                         
                         if 'Логин RS' in cleaned_df.columns and 'RS' in cleaned_df.columns:
-                            # Находим строки где оба поля пустые
+                            # Находим строки где оба поля пустые (ПОСЛЕ всех обогащений)
                             mask_empty_both = (
                                 cleaned_df['Логин RS'].astype(str).str.strip().isin(['', '-', '0', 'nan', 'none', 'null', 'нет']) |
                                 cleaned_df['Логин RS'].isna()
@@ -270,7 +270,7 @@ with tab1:
                             st.write(f"**Всего строк с RS = пусто И Логин RS = пусто:** {total_empty_both}")
                             
                             if total_empty_both > 0:
-                                # Создаем словарь для поиска
+                                # Создаем словарь для быстрого поиска
                                 project_dict = {}
                                 for _, row in projects_df.iterrows():
                                     code = str(row['Код проекта']).strip()
@@ -279,9 +279,22 @@ with tab1:
                                     if code and address and login:
                                         project_dict[(code, address)] = login
                                 
-                                # Собираем данные для таблицы
-                                diagnostic_rows = []
+                                # СЧИТАЕМ ОБОГАЩЕННЫЕ ПО ВСЕМ СТРОКАМ
                                 enriched_count = 0
+                                for _, row in empty_both_df.iterrows():
+                                    set_code = str(row['SetCode']).strip() if 'SetCode' in row else ''
+                                    address = str(row['Address']).strip() if 'Address' in row else ''
+                                    
+                                    key = (set_code, address)
+                                    if key in project_dict:
+                                        enriched_count += 1
+                                
+                                # ПОКАЗЫВАЕМ СТАТИСТИКУ ПО ВСЕМ СТРОКАМ
+                                st.write(f"**Из них обогащено логин RS:** {enriched_count} из {total_empty_both}")
+                                
+                                # ПОКАЗЫВАЕМ ТАБЛИЦУ (ТОЛЬКО 10 СТРОК)
+                                st.write("**Пример строк (первые 10):**")
+                                diagnostic_rows = []
                                 
                                 for idx, row in empty_both_df.head(10).iterrows():
                                     set_code = str(row['SetCode']).strip() if 'SetCode' in row else ''
@@ -290,11 +303,6 @@ with tab1:
                                     key = (set_code, address)
                                     found = key in project_dict
                                     login_value = project_dict.get(key, '')
-                                    
-                                    current_login = str(row['Логин RS']).strip()
-                                    is_enriched = current_login not in ['', '-', '0', 'nan', 'none', 'null', 'нет']
-                                    if is_enriched:
-                                        enriched_count += 1
                                     
                                     diagnostic_rows.append({
                                         'Код проекта (SetCode)': set_code,
@@ -307,7 +315,6 @@ with tab1:
                                 
                                 if diagnostic_rows:
                                     st.dataframe(pd.DataFrame(diagnostic_rows), use_container_width=True)
-                                    st.write(f"**Обогащено логин RS:** {enriched_count} из {min(total_empty_both, 10)} (показано)")
                                     if total_empty_both > 10:
                                         st.caption(f"⚠️ Показаны первые 10 строк из {total_empty_both}")
                                 else:
