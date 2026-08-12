@@ -127,8 +127,8 @@ def load_project_motivation(file):
     Загружает справочник Проект-Мотивация
     
     Ожидаемая структура:
-    Имя проекта | Мотивация
-    05.2026_Ёбидоёби | 1
+    Имя клиента | Мотивация
+    Ёбидоёби | 1
     """
     try:
         df = pd.read_excel(file, engine='openpyxl')
@@ -193,6 +193,141 @@ def load_name_login(file):
             'last_upload': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             'removed_duplicates': removed_count,
             'duplicate_count': duplicate_count
+        }
+        
+    except Exception as e:
+        return {
+            'status': 'error',
+            'message': f"Ошибка загрузки: {str(e)}"
+        }
+
+
+def load_distribution(file):
+    """
+    Загружает справочник Распределение
+    
+    Ожидаемая структура (3 таблицы горизонтально):
+    Таблица 1: ФИ ASM | регион | рег 2 | ФИ RS | логин RS | статус (RS/СТАЖЕР)
+    Таблица 2: распределение по Питеру | ФИ RS | логин RS | статус (RS/СТАЖЕР)
+    Таблица 3: Москва | ФИ RS | логин RS | статус (RS/СТАЖЕР)
+    
+    Returns:
+        dict: {
+            'region_mapping': {'регион': 'логин RS'},
+            'spb_mapping': {'распределение по Питеру': 'логин RS'},
+            'moscow_mapping': {'Москва': 'логин RS'}
+        }
+    """
+    try:
+        df = pd.read_excel(file, engine='openpyxl', header=None)
+        
+        region_mapping = {}
+        spb_mapping = {}
+        moscow_mapping = {}
+        
+        # ============ 1. Парсим таблицу Регионов ============
+        # Находим строку с заголовками "ФИ ASM" или "регион"
+        header_row_idx = None
+        for idx, row in df.iterrows():
+            row_str = row.astype(str).str.lower().str.strip().values
+            if any('фи asm' in str(val).lower() for val in row_str):
+                header_row_idx = idx
+                break
+        
+        if header_row_idx is not None:
+            header_row = df.iloc[header_row_idx].astype(str).str.strip()
+            
+            col_region = None
+            col_login_rs = None
+            
+            # Ищем колонки в области первой таблицы (первые 10 колонок)
+            for idx in range(0, 10):
+                val = str(header_row.get(idx, '')).lower()
+                if 'регион' in val and 'рег 2' not in val and 'рег2' not in val:
+                    col_region = idx
+                if 'логин rs' in val:
+                    col_login_rs = idx
+            
+            if col_region is not None and col_login_rs is not None:
+                for idx in range(header_row_idx + 1, len(df)):
+                    region = str(df.iloc[idx, col_region]).strip()
+                    login = str(df.iloc[idx, col_login_rs]).strip()
+                    if region and region != 'nan' and login and login != 'nan':
+                        region_mapping[region] = login
+        
+        # ============ 2. Парсим таблицу СПб ============
+        # Ищем строку с "распределение по питеру"
+        header_row_idx_spb = None
+        for idx, row in df.iterrows():
+            row_str = row.astype(str).str.lower().str.strip().values
+            if any('распределение по питеру' in str(val).lower() for val in row_str):
+                header_row_idx_spb = idx
+                break
+        
+        if header_row_idx_spb is not None:
+            header_row_spb = df.iloc[header_row_idx_spb].astype(str).str.strip()
+            
+            col_client = None
+            col_login = None
+            
+            # Ищем колонки в области таблицы СПб (начиная с позиции заголовка)
+            for idx in range(header_row_idx_spb, header_row_idx_spb + 10):
+                val = str(header_row_spb.get(idx, '')).lower()
+                if 'распределение по питеру' in val:
+                    col_client = idx
+                if 'логин rs' in val:
+                    col_login = idx
+            
+            if col_client is not None and col_login is not None:
+                for idx in range(header_row_idx_spb + 1, len(df)):
+                    client = str(df.iloc[idx, col_client]).strip()
+                    login = str(df.iloc[idx, col_login]).strip()
+                    if client and client != 'nan' and login and login != 'nan':
+                        spb_mapping[client] = login
+        
+        # ============ 3. Парсим таблицу Москва ============
+        # Ищем строку с "Москва"
+        header_row_idx_msk = None
+        for idx, row in df.iterrows():
+            row_str = row.astype(str).str.lower().str.strip().values
+            if any('москва' in str(val).lower() for val in row_str):
+                header_row_idx_msk = idx
+                break
+        
+        if header_row_idx_msk is not None:
+            header_row_msk = df.iloc[header_row_idx_msk].astype(str).str.strip()
+            
+            col_client = None
+            col_login = None
+            
+            # Ищем колонки в области таблицы Москва (начиная с позиции заголовка)
+            for idx in range(header_row_idx_msk, header_row_idx_msk + 10):
+                val = str(header_row_msk.get(idx, '')).lower()
+                if 'москва' in val:
+                    col_client = idx
+                if 'логин rs' in val:
+                    col_login = idx
+            
+            if col_client is not None and col_login is not None:
+                for idx in range(header_row_idx_msk + 1, len(df)):
+                    client = str(df.iloc[idx, col_client]).strip()
+                    login = str(df.iloc[idx, col_login]).strip()
+                    if client and client != 'nan' and login and login != 'nan':
+                        moscow_mapping[client] = login
+        
+        return {
+            'status': 'success',
+            'data': {
+                'region_mapping': region_mapping,
+                'spb_mapping': spb_mapping,
+                'moscow_mapping': moscow_mapping
+            },
+            'last_upload': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'stats': {
+                'regions': len(region_mapping),
+                'spb': len(spb_mapping),
+                'moscow': len(moscow_mapping)
+            }
         }
         
     except Exception as e:
