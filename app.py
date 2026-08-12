@@ -19,6 +19,7 @@ from settings_loader import (
     load_region_type,
     load_project_motivation,
     load_name_login,
+    load_distribution,
     save_to_json_github,
     load_from_json_github
 )
@@ -57,6 +58,7 @@ for key, default_value in DEFAULT_STATE.items():
         st.session_state[key] = default_value
 
 # ==================== ЗАГРУЗКА СПРАВОЧНИКОВ ИЗ GITHUB ====================
+# Загружаем справочник "Имя-логин" из GitHub при старте
 name_login_data = load_from_json_github('name_login')
 if name_login_data is not None:
     st.session_state.name_login_df = pd.DataFrame(name_login_data['data'])
@@ -68,6 +70,7 @@ tab1, tab2 = st.tabs(["📊 Основная", "⚙️ Настройки"])
 with tab1:
     st.markdown("---")
     
+    # Загрузка файла
     uploaded_file = st.file_uploader(
         "📁 Загрузите Excel-файл 'Массив итоги месяца'",
         type=['xlsx', 'xls'],
@@ -99,7 +102,7 @@ with tab1:
         
         df = st.session_state.original_df
     
-    # Статистика
+    # ==================== СТАТИСТИКА ====================
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("📊 Всего строк", st.session_state.total_rows)
@@ -110,12 +113,13 @@ with tab1:
         deleted = st.session_state.deleted_rows if st.session_state.is_cleaned else 0
         st.metric("🗑️ Удалено строк", deleted)
     
+    # ==================== ИНДИКАТОР ФАЙЛА ====================
     if st.session_state.original_df is not None and uploaded_file is not None:
         st.caption(f"📄 Текущий файл: **{uploaded_file.name}** ({st.session_state.total_rows} строк)")
     
     st.markdown("---")
     
-    # Дополнительные справочники
+    # ==================== ДОПОЛНИТЕЛЬНЫЕ ЗАГРУЗЧИКИ ====================
     st.subheader("📁 Дополнительные справочники")
     
     col1, col2, col3 = st.columns(3)
@@ -173,7 +177,7 @@ with tab1:
     
     st.markdown("---")
     
-    # Кнопка сброса
+    # ==================== КНОПКА СБРОСА ====================
     if st.button("🗑️ Сбросить все данные", use_container_width=True):
         clear_cache()
         for key in list(DEFAULT_STATE.keys()):
@@ -183,7 +187,7 @@ with tab1:
     
     st.markdown("---")
     
-    # Кнопка запуска
+    # ==================== КНОПКА ЗАПУСКА ====================
     if st.session_state.original_df is not None:
         if st.button("🚀 Запустить расчет", type="primary", use_container_width=True):
             with st.spinner("Выполняется расчет..."):
@@ -192,11 +196,14 @@ with tab1:
                     
                     progress_bar = st.progress(0, text="Начинаем расчет...")
                     
+                    # ============================================================
+                    # 1. ОЧИСТКА ДАННЫХ
+                    # ============================================================
                     progress_bar.progress(10, text="Очистка данных...")
                     cleaned_df, deleted_df = clean_data(df)
                     
                     # ============================================================
-                    # 1. СНАЧАЛА ЧИТАЕМ СПРАВОЧНИКИ ИЗ uploaded_files
+                    # 2. ЧИТАЕМ СПРАВОЧНИКИ ИЗ uploaded_files
                     # ============================================================
                     projects_file = st.session_state.uploaded_files.get('projects_outside_checker')
                     if projects_file is not None:
@@ -217,7 +224,7 @@ with tab1:
                         st.session_state.hvosty_time = datetime.now().strftime("%d.%m.%Y %H:%M")
                     
                     # ============================================================
-                    # 2. ТЕПЕРЬ ЗАПОЛНЯЕМ Логин RS и RS (с уже загруженным справочником)
+                    # 3. ЗАПОЛНЕНИЕ Логин RS и RS
                     # ============================================================
                     progress_bar.progress(25, text="Заполнение Логин RS и RS...")
                     if st.session_state.projects_outside_checker_df is not None:
@@ -227,107 +234,109 @@ with tab1:
                             st.session_state.name_login_df
                         )
                     
-                    # ==================== ДИАГНОСТИКА ====================
-                    st.subheader("🔍 ДИАГНОСТИКА")
+                    # # ============================================================
+                    # # 4. ДИАГНОСТИКА
+                    # # ============================================================
+                    # st.subheader("🔍 ДИАГНОСТИКА")
                     
-                    if 'Логин RS' in cleaned_df.columns and 'RS' in cleaned_df.columns:
-                        mask = cleaned_df['Логин RS'].astype(str).str.lower().str.strip() == 'rukovoditel2'
+                    # if 'Логин RS' in cleaned_df.columns and 'RS' in cleaned_df.columns:
+                    #     mask = cleaned_df['Логин RS'].astype(str).str.lower().str.strip() == 'rukovoditel2'
                         
-                        if mask.any():
-                            st.success("✅ Найдена строка с Логин RS = Rukovoditel2")
-                            row = cleaned_df[mask].iloc[0]
+                    #     if mask.any():
+                    #         st.success("✅ Найдена строка с Логин RS = Rukovoditel2")
+                    #         row = cleaned_df[mask].iloc[0]
                             
-                            login_rs = str(row['Логин RS']).strip()
-                            st.write(f"**1. Логин RS** = '{login_rs}' → {'✅ ЗАПОЛНЕН' if login_rs else '❌ ПУСТОЙ'}")
+                    #         login_rs = str(row['Логин RS']).strip()
+                    #         st.write(f"**1. Логин RS** = '{login_rs}' → {'✅ ЗАПОЛНЕН' if login_rs else '❌ ПУСТОЙ'}")
                             
-                            rs_value = str(row['RS']).strip()
-                            st.write(f"**2. Текущее RS** = '{rs_value}'")
+                    #         rs_value = str(row['RS']).strip()
+                    #         st.write(f"**2. Текущее RS** = '{rs_value}'")
                             
-                            is_empty = rs_value == ''
-                            is_dash = rs_value == '-'
-                            is_zero = rs_value == '0'
-                            is_nan = rs_value == 'nan'
-                            has_koordinator = 'koordinator' in rs_value.lower()
-                            has_rukovoditel = 'rukovoditel' in rs_value.lower()
+                    #         is_empty = rs_value == ''
+                    #         is_dash = rs_value == '-'
+                    #         is_zero = rs_value == '0'
+                    #         is_nan = rs_value == 'nan'
+                    #         has_koordinator = 'koordinator' in rs_value.lower()
+                    #         has_rukovoditel = 'rukovoditel' in rs_value.lower()
                             
-                            st.write("**3. Условия для замены RS:**")
-                            st.write(f"   - RS пустая: {is_empty} {'✅' if is_empty else '❌'}")
-                            st.write(f"   - RS = '-': {is_dash} {'✅' if is_dash else '❌'}")
-                            st.write(f"   - RS = '0': {is_zero} {'✅' if is_zero else '❌'}")
-                            st.write(f"   - RS = 'nan': {is_nan} {'✅' if is_nan else '❌'}")
-                            st.write(f"   - RS содержит 'koordinator': {has_koordinator} {'✅' if has_koordinator else '❌'}")
-                            st.write(f"   - RS содержит 'rukovoditel': {has_rukovoditel} {'✅' if has_rukovoditel else '❌'}")
+                    #         st.write("**3. Условия для замены RS:**")
+                    #         st.write(f"   - RS пустая: {is_empty} {'✅' if is_empty else '❌'}")
+                    #         st.write(f"   - RS = '-': {is_dash} {'✅' if is_dash else '❌'}")
+                    #         st.write(f"   - RS = '0': {is_zero} {'✅' if is_zero else '❌'}")
+                    #         st.write(f"   - RS = 'nan': {is_nan} {'✅' if is_nan else '❌'}")
+                    #         st.write(f"   - RS содержит 'koordinator': {has_koordinator} {'✅' if has_koordinator else '❌'}")
+                    #         st.write(f"   - RS содержит 'rukovoditel': {has_rukovoditel} {'✅' if has_rukovoditel else '❌'}")
                             
-                            condition_met = is_empty or is_dash or is_zero or is_nan or has_koordinator or has_rukovoditel
-                            st.write(f"   → **ИТОГ:** {'✅ УСЛОВИЕ ВЫПОЛНЯЕТСЯ' if condition_met else '❌ УСЛОВИЕ НЕ ВЫПОЛНЯЕТСЯ'}")
+                    #         condition_met = is_empty or is_dash or is_zero or is_nan or has_koordinator or has_rukovoditel
+                    #         st.write(f"   → **ИТОГ:** {'✅ УСЛОВИЕ ВЫПОЛНЯЕТСЯ' if condition_met else '❌ УСЛОВИЕ НЕ ВЫПОЛНЯЕТСЯ'}")
                             
-                            name_login_df = st.session_state.get('name_login_df')
-                            if name_login_df is not None and not name_login_df.empty:
-                                if 'логин эм' in name_login_df.columns:
-                                    name_login_lower = name_login_df['логин эм'].astype(str).str.lower().str.strip()
-                                    found = (name_login_lower == 'rukovoditel2').any()
-                                    st.write(f"**4. Rukovoditel2 в справочнике 'Имя-логин':** {'✅ НАЙДЕН' if found else '❌ НЕ НАЙДЕН'}")
-                                    if found:
-                                        full_name = name_login_df[name_login_lower == 'rukovoditel2']['ЭМ'].iloc[0]
-                                        st.write(f"   → Найдено имя: '{full_name}'")
+                    #         name_login_df = st.session_state.get('name_login_df')
+                    #         if name_login_df is not None and not name_login_df.empty:
+                    #             if 'логин эм' in name_login_df.columns:
+                    #                 name_login_lower = name_login_df['логин эм'].astype(str).str.lower().str.strip()
+                    #                 found = (name_login_lower == 'rukovoditel2').any()
+                    #                 st.write(f"**4. Rukovoditel2 в справочнике 'Имя-логин':** {'✅ НАЙДЕН' if found else '❌ НЕ НАЙДЕН'}")
+                    #                 if found:
+                    #                     full_name = name_login_df[name_login_lower == 'rukovoditel2']['ЭМ'].iloc[0]
+                    #                     st.write(f"   → Найдено имя: '{full_name}'")
                                         
-                                        login_to_name_check = {}
-                                        for _, r in name_login_df.iterrows():
-                                            login = str(r['логин эм']).strip()
-                                            name = str(r['ЭМ']).strip()
-                                            login_to_name_check[login] = name
+                    #                     login_to_name_check = {}
+                    #                     for _, r in name_login_df.iterrows():
+                    #                         login = str(r['логин эм']).strip()
+                    #                         name = str(r['ЭМ']).strip()
+                    #                         login_to_name_check[login] = name
                                         
-                                        original_found = login_rs in login_to_name_check
-                                        st.write(f"   - login_rs '{login_rs}' in login_to_name: {'✅ ДА' if original_found else '❌ НЕТ'}")
+                    #                     original_found = login_rs in login_to_name_check
+                    #                     st.write(f"   - login_rs '{login_rs}' in login_to_name: {'✅ ДА' if original_found else '❌ НЕТ'}")
                                         
-                                        lower_found = login_rs.lower() in login_to_name_check
-                                        st.write(f"   - login_rs.lower() '{login_rs.lower()}' in login_to_name: {'✅ ДА' if lower_found else '❌ НЕТ'}")
+                    #                     lower_found = login_rs.lower() in login_to_name_check
+                    #                     st.write(f"   - login_rs.lower() '{login_rs.lower()}' in login_to_name: {'✅ ДА' if lower_found else '❌ НЕТ'}")
                                         
-                                        similar_keys = [k for k in login_to_name_check.keys() if 'rukovoditel' in k.lower()]
-                                        st.write(f"   - Ключи с 'rukovoditel': {similar_keys}")
-                                else:
-                                    st.write("**4.** ❌ В справочнике 'Имя-логин' нет колонки 'логин эм'")
-                            else:
-                                st.write("**4.** ❌ Справочник 'Имя-логин' НЕ ЗАГРУЖЕН или ПУСТОЙ")
+                    #                     similar_keys = [k for k in login_to_name_check.keys() if 'rukovoditel' in k.lower()]
+                    #                     st.write(f"   - Ключи с 'rukovoditel': {similar_keys}")
+                    #             else:
+                    #                 st.write("**4.** ❌ В справочнике 'Имя-логин' нет колонки 'логин эм'")
+                    #         else:
+                    #             st.write("**4.** ❌ Справочник 'Имя-логин' НЕ ЗАГРУЖЕН или ПУСТОЙ")
                             
-                            projects_df = st.session_state.get('projects_outside_checker_df')
-                            if projects_df is not None and not projects_df.empty:
-                                if 'логин ЭМ кто назначил' in projects_df.columns:
-                                    projects_lower = projects_df['логин ЭМ кто назначил'].astype(str).str.lower().str.strip()
-                                    found_in_projects = (projects_lower == 'rukovoditel2').any()
-                                    st.write(f"**5. Rukovoditel2 в 'Проекты вне чеккера':** {'✅ НАЙДЕН' if found_in_projects else '❌ НЕ НАЙДЕН'}")
-                                    if found_in_projects:
-                                        matched_rows = projects_df[projects_lower == 'rukovoditel2']
-                                        st.write(f"   → Найдено {len(matched_rows)} записей")
-                                        cols_to_show = [c for c in ['номер локации', 'Код проекта', 'логин ЭМ кто назначил'] if c in matched_rows.columns]
-                                        if cols_to_show:
-                                            st.dataframe(matched_rows[cols_to_show], use_container_width=True)
-                                else:
-                                    st.write("**5.** ❌ В справочнике нет колонки 'логин ЭМ кто назначил'")
-                            else:
-                                st.write("**5.** ❌ Справочник 'Проекты вне чеккера' НЕ ЗАГРУЖЕН или ПУСТОЙ")
+                    #         projects_df = st.session_state.get('projects_outside_checker_df')
+                    #         if projects_df is not None and not projects_df.empty:
+                    #             if 'логин ЭМ кто назначил' in projects_df.columns:
+                    #                 projects_lower = projects_df['логин ЭМ кто назначил'].astype(str).str.lower().str.strip()
+                    #                 found_in_projects = (projects_lower == 'rukovoditel2').any()
+                    #                 st.write(f"**5. Rukovoditel2 в 'Проекты вне чеккера':** {'✅ НАЙДЕН' if found_in_projects else '❌ НЕ НАЙДЕН'}")
+                    #                 if found_in_projects:
+                    #                     matched_rows = projects_df[projects_lower == 'rukovoditel2']
+                    #                     st.write(f"   → Найдено {len(matched_rows)} записей")
+                    #                     cols_to_show = [c for c in ['номер локации', 'Код проекта', 'логин ЭМ кто назначил'] if c in matched_rows.columns]
+                    #                     if cols_to_show:
+                    #                         st.dataframe(matched_rows[cols_to_show], use_container_width=True)
+                    #             else:
+                    #                 st.write("**5.** ❌ В справочнике нет колонки 'логин ЭМ кто назначил'")
+                    #         else:
+                    #             st.write("**5.** ❌ Справочник 'Проекты вне чеккера' НЕ ЗАГРУЖЕН или ПУСТОЙ")
                             
-                            st.write(f"**6. BranchID** = '{row.get('BranchID', 'НЕТ КОЛОНКИ')}'")
-                            st.write(f"**   SetCode** = '{row.get('SetCode', 'НЕТ КОЛОНКИ')}'")
+                    #         st.write(f"**6. BranchID** = '{row.get('BranchID', 'НЕТ КОЛОНКИ')}'")
+                    #         st.write(f"**   SetCode** = '{row.get('SetCode', 'НЕТ КОЛОНКИ')}'")
                             
-                            final_rs = str(row['RS']).strip()
-                            st.write(f"**7. Финальное RS** = '{final_rs}'")
-                            if final_rs and final_rs != '' and final_rs != 'nan':
-                                st.success(f"✅ RS заполнена: '{final_rs}'")
-                            else:
-                                st.warning(f"⚠️ RS НЕ заполнена")
+                    #         final_rs = str(row['RS']).strip()
+                    #         st.write(f"**7. Финальное RS** = '{final_rs}'")
+                    #         if final_rs and final_rs != '' and final_rs != 'nan':
+                    #             st.success(f"✅ RS заполнена: '{final_rs}'")
+                    #         else:
+                    #             st.warning(f"⚠️ RS НЕ заполнена")
                             
-                            with st.expander("📋 Все данные строки"):
-                                row_df = pd.DataFrame([row]).T
-                                row_df.columns = ['Значение']
-                                st.dataframe(row_df, use_container_width=True)
-                        else:
-                            st.warning("⚠️ Строка с Логин RS = Rukovoditel2 НЕ НАЙДЕНА")
-                    else:
-                        st.error("❌ Колонки 'Логин RS' или 'RS' отсутствуют")
+                    #         with st.expander("📋 Все данные строки"):
+                    #             row_df = pd.DataFrame([row]).T
+                    #             row_df.columns = ['Значение']
+                    #             st.dataframe(row_df, use_container_width=True)
+                    #     else:
+                    #         st.warning("⚠️ Строка с Логин RS = Rukovoditel2 НЕ НАЙДЕНА")
+                    # else:
+                    #     st.error("❌ Колонки 'Логин RS' или 'RS' отсутствуют")
                     
                     # ============================================================
-                    # 3. ОСТАЛЬНЫЕ РАСЧЕТЫ
+                    # 5. ОСТАЛЬНЫЕ РАСЧЕТЫ
                     # ============================================================
                     progress_bar.progress(35, text="Заполнение Проектная мотивация...")
                     project_motivation_data = load_from_json_github('project_motivation')
@@ -381,7 +390,7 @@ with tab1:
         st.button("🚀 Запустить расчет", type="primary", use_container_width=True, disabled=True)
         st.caption("⚠️ Сначала загрузите основной файл")
     
-    # Скачивание
+    # ==================== СКАЧИВАНИЕ ====================
     if st.session_state.is_cleaned:
         st.markdown("---")
         st.subheader("📥 Скачать результаты")
@@ -565,5 +574,86 @@ with tab2:
                             'last_upload': result['last_upload']
                         })
                         st.toast("✅ Справочник 'Имя-логин' сохранен в GitHub!", icon="✅")
+                    except Exception as e:
+                        st.toast(f"❌ Ошибка сохранения в GitHub: {str(e)}", icon="❌")
+    
+    st.markdown("---")
+    
+    # ==================== 2.4 РАСПРЕДЕЛЕНИЕ ====================
+    st.markdown("#### 📁 Распределение")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        distribution_file = st.file_uploader(
+            "Загрузите Excel-файл 'Распределение'",
+            type=['xlsx', 'xls'],
+            key="distribution"
+        )
+    
+    with col2:
+        try:
+            distribution_data = load_from_json_github('distribution')
+            if distribution_data is not None:
+                st.caption(f"📅 Последняя загрузка: {distribution_data.get('last_upload', 'неизвестно')}")
+                stats = distribution_data.get('stats', {})
+                if stats:
+                    st.caption(f"📊 Регионов: {stats.get('regions', 0)}, СПб: {stats.get('spb', 0)}, Москва: {stats.get('moscow', 0)}")
+        except Exception as e:
+            st.caption("⚠️ Не удалось загрузить из GitHub")
+    
+    if distribution_file is not None:
+        with st.spinner("Загрузка справочника..."):
+            result = load_distribution(distribution_file)
+            
+            if result['status'] == 'error':
+                st.error(f"❌ {result['message']}")
+            else:
+                data = result['data']
+                stats = result['stats']
+                
+                st.success(f"✅ Загружено: регионов {stats['regions']}, СПб {stats['spb']}, Москва {stats['moscow']}")
+                
+                # Показываем предпросмотр
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.caption("Регионы")
+                    if data['region_mapping']:
+                        st.dataframe(
+                            pd.DataFrame(list(data['region_mapping'].items()), columns=['Регион', 'Логин RS']),
+                            use_container_width=True
+                        )
+                    else:
+                        st.info("Нет данных")
+                
+                with col2:
+                    st.caption("СПб")
+                    if data['spb_mapping']:
+                        st.dataframe(
+                            pd.DataFrame(list(data['spb_mapping'].items()), columns=['Клиент', 'Логин RS']),
+                            use_container_width=True
+                        )
+                    else:
+                        st.info("Нет данных")
+                
+                with col3:
+                    st.caption("Москва")
+                    if data['moscow_mapping']:
+                        st.dataframe(
+                            pd.DataFrame(list(data['moscow_mapping'].items()), columns=['Клиент', 'Логин RS']),
+                            use_container_width=True
+                        )
+                    else:
+                        st.info("Нет данных")
+                
+                if st.button("💾 Сохранить в GitHub", key="save_distribution"):
+                    try:
+                        save_to_json_github('distribution', {
+                            'data': data,
+                            'last_upload': result['last_upload'],
+                            'stats': stats
+                        })
+                        st.toast("✅ Справочник 'Распределение' сохранен в GitHub!", icon="✅")
                     except Exception as e:
                         st.toast(f"❌ Ошибка сохранения в GitHub: {str(e)}", icon="❌")
