@@ -270,8 +270,15 @@ def load_distribution(file):
             col_client = None
             col_login = None
             
-            # Ищем колонки в области таблицы СПб (начиная с позиции заголовка)
-            for idx in range(header_row_idx_spb, header_row_idx_spb + 10):
+            # Находим колонку, где находится заголовок "распределение по питеру"
+            start_col_spb = 0
+            for idx, val in header_row_spb.items():
+                if 'распределение по питеру' in str(val).lower():
+                    start_col_spb = idx
+                    break
+            
+            # Ищем колонки в области таблицы СПб (начиная с найденной колонки)
+            for idx in range(start_col_spb, start_col_spb + 10):
                 val = str(header_row_spb.get(idx, '')).lower()
                 if 'распределение по питеру' in val:
                     col_client = idx
@@ -300,8 +307,15 @@ def load_distribution(file):
             col_client = None
             col_login = None
             
-            # Ищем колонки в области таблицы Москва (начиная с позиции заголовка)
-            for idx in range(header_row_idx_msk, header_row_idx_msk + 10):
+            # Находим колонку, где находится заголовок "Москва"
+            start_col_msk = 0
+            for idx, val in header_row_msk.items():
+                if 'москва' in str(val).lower():
+                    start_col_msk = idx
+                    break
+            
+            # Ищем колонки в области таблицы Москва (начиная с найденной колонки)
+            for idx in range(start_col_msk, start_col_msk + 10):
                 val = str(header_row_msk.get(idx, '')).lower()
                 if 'москва' in val:
                     col_client = idx
