@@ -486,3 +486,64 @@ def fill_recruit_adjustments(cleaned_df, zp_shtrafy_df):
     df = df.drop(columns=['мотивация_1_count', 'denominator'])
     
     return df
+
+def fill_login_rs_from_distribution(cleaned_df, distribution_data):
+    """
+    Заполняет Логин RS из справочника "Распределение"
+    
+    Условие: Логин RS пустой И RS заполнена
+    
+    Логика:
+    - Если регион = Москва → ищем по ClientName в moscow_mapping
+    - Если регион = СПб → ищем по ClientName в spb_mapping
+    - Если регион ≠ Москва и ≠ СПб → ищем по региону в region_mapping
+    """
+    df = cleaned_df.copy()
+    
+    if distribution_data is None:
+        return df
+    
+    region_mapping = distribution_data.get('region_mapping', {})
+    spb_mapping = distribution_data.get('spb_mapping', {})
+    moscow_mapping = distribution_data.get('moscow_mapping', {})
+    
+    region_dict = {k.lower().strip(): v for k, v in region_mapping.items()}
+    spb_dict = {k.lower().strip(): v for k, v in spb_mapping.items()}
+    moscow_dict = {k.lower().strip(): v for k, v in moscow_mapping.items()}
+    
+    def get_login_rs(row):
+        login_rs = str(row['Логин RS']).strip()
+        rs_value = str(row['RS']).strip()
+        region = str(row['RegionName согласно распределения АСС']).strip().lower()
+        client_name = str(row['ClientName']).strip().lower()
+        
+        # Если Логин RS уже заполнен — пропускаем
+        if login_rs and login_rs != '' and login_rs != 'nan':
+            return row['Логин RS']
+        
+        # Если RS пустая — не заполняем
+        if not rs_value or rs_value == '' or rs_value == 'nan':
+            return row['Логин RS']
+        
+        # Определяем тип региона
+        is_msk = any(x in region for x in ['мск', 'москва'])
+        is_spb = any(x in region for x in ['спб', 'санкт-петербург'])
+        
+        if is_msk:
+            # Москва — ищем по клиенту в moscow_mapping
+            if client_name in moscow_dict:
+                return moscow_dict[client_name]
+        elif is_spb:
+            # СПб — ищем по клиенту в spb_mapping
+            if client_name in spb_dict:
+                return spb_dict[client_name]
+        else:
+            # Регион — ищем по региону в region_mapping
+            if region in region_dict:
+                return region_dict[region]
+        
+        return row['Логин RS']
+    
+    df['Логин RS'] = df.apply(get_login_rs, axis=1)
+    
+    return df
