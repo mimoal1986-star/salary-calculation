@@ -245,6 +245,79 @@ with tab1:
                     progress_bar.progress(30, text="ВПР по сцепке SetCode + Address...")
                     if st.session_state.projects_outside_checker_df is not None:
                         cleaned_df = fill_rs_login_from_projects(cleaned_df, st.session_state.projects_outside_checker_df)
+
+                    # ============================================================
+                    # ДИАГНОСТИКА: ВПР по сцепке SetCode + Address
+                    # ============================================================
+                    st.subheader("📊 ДИАГНОСТИКА: ВПР по сцепке SetCode + Address")
+                    
+                    if st.session_state.projects_outside_checker_df is not None:
+                        projects_df = st.session_state.projects_outside_checker_df
+                        
+                        if 'Логин RS' in cleaned_df.columns and 'RS' in cleaned_df.columns:
+                            # Находим строки где оба поля пустые
+                            mask_empty_both = (
+                                cleaned_df['Логин RS'].astype(str).str.strip().isin(['', '-', '0', 'nan', 'none', 'null', 'нет']) |
+                                cleaned_df['Логин RS'].isna()
+                            ) & (
+                                cleaned_df['RS'].astype(str).str.strip().isin(['', '-', '0', 'nan', 'none', 'null', 'нет']) |
+                                cleaned_df['RS'].isna()
+                            )
+                            
+                            empty_both_df = cleaned_df[mask_empty_both].copy()
+                            total_empty_both = len(empty_both_df)
+                            
+                            st.write(f"**Всего строк с RS = пусто И Логин RS = пусто:** {total_empty_both}")
+                            
+                            if total_empty_both > 0:
+                                # Создаем словарь для поиска
+                                project_dict = {}
+                                for _, row in projects_df.iterrows():
+                                    code = str(row['Код проекта']).strip()
+                                    address = str(row['адрес']).strip()
+                                    login = str(row['логин ЭМ кто назначил']).strip()
+                                    if code and address and login:
+                                        project_dict[(code, address)] = login
+                                
+                                # Собираем данные для таблицы
+                                diagnostic_rows = []
+                                enriched_count = 0
+                                
+                                for idx, row in empty_both_df.head(10).iterrows():
+                                    set_code = str(row['SetCode']).strip() if 'SetCode' in row else ''
+                                    address = str(row['Address']).strip() if 'Address' in row else ''
+                                    
+                                    key = (set_code, address)
+                                    found = key in project_dict
+                                    login_value = project_dict.get(key, '')
+                                    
+                                    current_login = str(row['Логин RS']).strip()
+                                    is_enriched = current_login not in ['', '-', '0', 'nan', 'none', 'null', 'нет']
+                                    if is_enriched:
+                                        enriched_count += 1
+                                    
+                                    diagnostic_rows.append({
+                                        'Код проекта (SetCode)': set_code,
+                                        'Адрес (Address)': address,
+                                        'RS пусто': '✅' if str(row['RS']).strip() in ['', '-', '0', 'nan', 'none', 'null', 'нет'] else '❌',
+                                        'Логин RS пусто': '✅' if str(row['Логин RS']).strip() in ['', '-', '0', 'nan', 'none', 'null', 'нет'] else '❌',
+                                        'Найдено в справочнике': '✅' if found else '❌',
+                                        'логин ЭМ кто назначил': login_value if login_value else '—'
+                                    })
+                                
+                                if diagnostic_rows:
+                                    st.dataframe(pd.DataFrame(diagnostic_rows), use_container_width=True)
+                                    st.write(f"**Обогащено логин RS:** {enriched_count} из {min(total_empty_both, 10)} (показано)")
+                                    if total_empty_both > 10:
+                                        st.caption(f"⚠️ Показаны первые 10 строк из {total_empty_both}")
+                                else:
+                                    st.info("Нет данных для отображения")
+                            else:
+                                st.success("✅ Нет строк с обоими пустыми полями")
+                        else:
+                            st.warning("⚠️ Колонки 'Логин RS' или 'RS' отсутствуют")
+                    else:
+                        st.warning("⚠️ Справочник 'Проекты вне чеккера' не загружен")
                     
                     # # ============================================================
                     # # 4. ДИАГНОСТИКА
