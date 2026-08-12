@@ -8,6 +8,7 @@ from data_cleaner import (
     clean_data,
     fill_rs_and_em,
     fill_login_rs_from_distribution,
+    fill_rs_login_from_projects,
     fill_project_motivation,
     fill_region_type,
     fill_separate_motivation,
@@ -239,6 +240,11 @@ with tab1:
                     distribution_data = load_from_json_github('distribution')
                     if distribution_data is not None:
                         cleaned_df = fill_login_rs_from_distribution(cleaned_df, distribution_data['data'])
+
+                    # Шаг 2.6: ВПР по сцепке SetCode + Address
+                    progress_bar.progress(30, text="ВПР по сцепке SetCode + Address...")
+                    if st.session_state.projects_outside_checker_df is not None:
+                        cleaned_df = fill_rs_login_from_projects(cleaned_df, st.session_state.projects_outside_checker_df)
                     
                     # # ============================================================
                     # # 4. ДИАГНОСТИКА
