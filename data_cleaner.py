@@ -443,7 +443,7 @@ def fill_recruit_adjustments(cleaned_df, zp_shtrafy_df):
         axis=1
     )
     
-    cols_to_sum = ['зп RS', 'надбавка на анкету', 'рекрут на анкету', 'корректировка на анкету', 'корректировка холостых', 'ЧТО-ТО']
+    cols_to_sum = ['зп RS', 'надбавка на анкету', 'рекрут на анкету', 'корректировка на анкету', 'корректировка холостых']
     for col in cols_to_sum:
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
@@ -610,7 +610,7 @@ def fill_multon(cleaned_df, multon_df):
             login, motivation = multon_dict[crit_id]
             if not is_empty_value(login):
                 row['Логин RS'] = login
-            row['ЧТО-ТО'] = motivation
+            row['отдельная мотивация'] = motivation
         
         return row
     
