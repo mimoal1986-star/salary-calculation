@@ -309,3 +309,54 @@ def load_distribution(file):
             'status': 'error',
             'message': f"Ошибка загрузки: {str(e)}"
         }
+
+def load_multon(file):
+    """
+    Загружает справочник Мултон
+    
+    Ожидаемая структура:
+    Номер анкеты с ПО | ... | логин ЭМ кто назначил | Проектная
+    """
+    try:
+        df = pd.read_excel(file, engine='openpyxl')
+        
+        if df.empty:
+            return {
+                'status': 'error',
+                'message': "Файл пуст"
+            }
+        
+        # Проверяем наличие обязательных колонок
+        required_cols = ['Номер анкеты с ПО', 'логин ЭМ кто назначил', 'Проектная']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            return {
+                'status': 'error',
+                'message': f"Отсутствуют колонки: {', '.join(missing_cols)}"
+            }
+        
+        # Оставляем только нужные колонки
+        df = df[['Номер анкеты с ПО', 'логин ЭМ кто назначил', 'Проектная']].copy()
+        
+        # Очищаем от пустых строк
+        df = df.dropna(subset=['Номер анкеты с ПО', 'логин ЭМ кто назначил'])
+        
+        # Приводим номер анкеты к строке
+        df['Номер анкеты с ПО'] = df['Номер анкеты с ПО'].astype(str).str.strip()
+        df['логин ЭМ кто назначил'] = df['логин ЭМ кто назначил'].astype(str).str.strip()
+        df['Проектная'] = pd.to_numeric(df['Проектная'], errors='coerce').fillna(0)
+        
+        return {
+            'status': 'success',
+            'data': df,
+            'last_upload': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'stats': {
+                'rows': len(df)
+            }
+        }
+        
+    except Exception as e:
+        return {
+            'status': 'error',
+            'message': f"Ошибка загрузки: {str(e)}"
+        }
