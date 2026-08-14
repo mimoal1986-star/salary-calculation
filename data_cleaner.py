@@ -493,8 +493,8 @@ def fill_login_rs_from_distribution(cleaned_df, distribution_data):
             return row['Логин RS']
         
         # Определяем тип региона
-        is_msk = any(x in region for x in ['мск', 'москва'])
-        is_spb = any(x in region for x in ['спб', 'санкт-петербург'])
+        is_msk = any(x in region for x in ['московская область', 'москва'])
+        is_spb = any(x in region for x in ['ленинградская область', 'санкт-петербург'])
         
         if is_msk:
             # Москва — ищем по клиенту в moscow_mapping
