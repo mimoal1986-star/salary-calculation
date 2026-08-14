@@ -461,7 +461,7 @@ def fill_recruit_adjustments(cleaned_df, zp_shtrafy_df):
         axis=1
     )
     
-    cols_to_sum = ['зп RS', 'надбавка на анкету', 'рекрут на анкету', 'корректировка на анкету', 'корректировка холостых']
+    cols_to_sum = ['зп RS', 'надбавка на анкету', 'рекрут на анкету', 'корректировка на анкету', 'корректировка холостых', 'отдельная мотивация']
     for col in cols_to_sum:
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
