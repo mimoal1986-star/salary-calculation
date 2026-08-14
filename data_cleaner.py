@@ -443,7 +443,7 @@ def fill_recruit_adjustments(cleaned_df, zp_shtrafy_df):
         axis=1
     )
     
-    cols_to_sum = ['зп RS', 'надбавка на анкету', 'рекрут на анкету', 'корректировка на анкету', 'корректировка холостых']
+    cols_to_sum = ['зп RS', 'надбавка на анкету', 'рекрут на анкету', 'корректировка на анкету', 'корректировка холостых', 'ЧТО-ТО']
     for col in cols_to_sum:
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
@@ -564,6 +564,53 @@ def fill_rs_login_from_projects(cleaned_df, projects_df):
             if key in project_dict:
                 login = project_dict[key]
                 row['Логин RS'] = login
+        
+        return row
+    
+    df = df.apply(fill_row, axis=1)
+    
+    return df
+
+def fill_multon(cleaned_df, multon_df):
+    """
+    Заполняет Логин RS и ЧТО-ТО из справочника Мултон
+    
+    Условие: Тип проекта = Мултон И CritID = Номер анкеты с ПО
+    
+    Запускать ПОСЛЕ всех обогащений!
+    """
+    df = cleaned_df.copy()
+    
+    if multon_df is None or multon_df.empty:
+        return df
+    
+    # Создаем словарь: Номер анкеты с ПО → (логин ЭМ кто назначил, Проектная)
+    multon_dict = {}
+    for _, row in multon_df.iterrows():
+        anketa = str(row['Номер анкеты с ПО']).strip()
+        login = str(row['логин ЭМ кто назначил']).strip()
+        project_motivation = row['Проектная']
+        
+        if anketa and login:
+            multon_dict[anketa] = (login, project_motivation)
+    
+    def fill_row(row):
+        # Проверяем, что тип проекта = Мултон
+        project_type = str(row['Тип проекта (р/бр/неполевой)']).strip()
+        if project_type != 'Мултон':
+            return row
+        
+        crit_id = str(row['CritID']).strip()
+        
+        # Проверяем, что CritID не пустой
+        if is_empty_value(crit_id):
+            return row
+        
+        if crit_id in multon_dict:
+            login, motivation = multon_dict[crit_id]
+            if not is_empty_value(login):
+                row['Логин RS'] = login
+            row['ЧТО-ТО'] = motivation
         
         return row
     
