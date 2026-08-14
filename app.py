@@ -9,6 +9,7 @@ from data_cleaner import (
     fill_rs_and_em,
     fill_login_rs_from_distribution,
     fill_rs_login_from_projects,
+    fill_multon,
     fill_project_motivation,
     fill_region_type,
     fill_separate_motivation,
@@ -22,6 +23,7 @@ from settings_loader import (
     load_project_motivation,
     load_name_login,
     load_distribution,
+    load_multon,
     save_to_json_github,
     load_from_json_github
 )
@@ -245,6 +247,13 @@ with tab1:
                     progress_bar.progress(30, text="ВПР по сцепке SetCode + Address...")
                     if st.session_state.projects_outside_checker_df is not None:
                         cleaned_df = fill_rs_login_from_projects(cleaned_df, st.session_state.projects_outside_checker_df)
+
+                    # Шаг 2.7: Обогащение из Мултон
+                    progress_bar.progress(32, text="Обогащение из Мултон...")
+                    multon_data = load_from_json_github('multon')
+                    if multon_data is not None:
+                        multon_df = pd.DataFrame(multon_data['data'])
+                        cleaned_df = fill_multon(cleaned_df, multon_df)
 
                     # # ============================================================
                     # # ДИАГНОСТИКА: ВПР по сцепке SetCode + Address
@@ -747,5 +756,56 @@ with tab2:
                             'stats': stats
                         })
                         st.toast("✅ Справочник 'Распределение' сохранен в GitHub!", icon="✅")
+                    except Exception as e:
+                        st.toast(f"❌ Ошибка сохранения в GitHub: {str(e)}", icon="❌")
+
+    st.markdown("---")
+    
+    # ==================== 2.5 МУЛТОН ====================
+    st.markdown("#### 📁 Мултон")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        multon_file = st.file_uploader(
+            "Загрузите Excel-файл 'Мултон'",
+            type=['xlsx', 'xls'],
+            key="multon"
+        )
+    
+    with col2:
+        try:
+            multon_data = load_from_json_github('multon')
+            if multon_data is not None:
+                st.caption(f"📅 Последняя загрузка: {multon_data.get('last_upload', 'неизвестно')}")
+                stats = multon_data.get('stats', {})
+                if stats:
+                    st.caption(f"📊 Записей: {stats.get('rows', 0)}")
+        except Exception as e:
+            st.caption("⚠️ Не удалось загрузить из GitHub")
+    
+    if multon_file is not None:
+        with st.spinner("Загрузка справочника..."):
+            result = load_multon(multon_file)
+            
+            if result['status'] == 'error':
+                st.error(f"❌ {result['message']}")
+            else:
+                data = result['data']
+                stats = result['stats']
+                
+                st.success(f"✅ Загружено {stats['rows']} записей")
+                
+                # Показываем предпросмотр
+                st.dataframe(data.head(10), use_container_width=True)
+                
+                if st.button("💾 Сохранить в GitHub", key="save_multon"):
+                    try:
+                        save_to_json_github('multon', {
+                            'data': data.to_dict('records'),
+                            'last_upload': result['last_upload'],
+                            'stats': stats
+                        })
+                        st.toast("✅ Справочник 'Мултон' сохранен в GitHub!", icon="✅")
                     except Exception as e:
                         st.toast(f"❌ Ошибка сохранения в GitHub: {str(e)}", icon="❌")
