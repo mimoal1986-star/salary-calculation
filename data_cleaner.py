@@ -158,7 +158,7 @@ def clean_data(df):
         
         # Удаляем строки, где Проекты начинается с "_" (кроме "_SINGLE")
         project_mask = working_df['Проекты'].apply(
-            lambda x: str(x).startswith('_') and str(x) != '_SINGLE'
+            lambda x: str(x).startswith('_') and '_single' not in str(x).lower()
         )
         
         deleted = working_df[project_mask].copy()
