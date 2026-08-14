@@ -313,16 +313,34 @@ def fill_region_type(cleaned_df, region_type_df):
 
 
 def fill_separate_motivation(cleaned_df):
+    """
+    Заполняет колонку отдельная мотивация
+    
+    Логика:
+    - Если тип проекта = Мултон → пропускаем (будет заполнено в fill_multon)
+    - Если проектная мотивация = 1 → отдельная мотивация = ЧТО-ТО - ВСЕГО
+    - Иначе → отдельная мотивация = пусто
+    """
     df = cleaned_df.copy()
     
+    # Преобразуем колонки в числа
     df['ЧТО-ТО'] = pd.to_numeric(df['ЧТО-ТО'], errors='coerce').fillna(0)
     df['ВСЕГО'] = pd.to_numeric(df['ВСЕГО'], errors='coerce').fillna(0)
     df['проектная мотивация'] = pd.to_numeric(df['проектная мотивация'], errors='coerce').fillna(0)
     
-    df['отдельная мотивация'] = df.apply(
-        lambda row: row['ЧТО-ТО'] - row['ВСЕГО'] if row['проектная мотивация'] == 1 else '',
-        axis=1
-    )
+    def calc_separate_motivation(row):
+        # Если тип проекта = Мултон — пропускаем (оставляем как есть)
+        project_type = str(row['Тип проекта (р/бр/неполевой)']).strip()
+        if project_type == 'Мултон':
+            return row['отдельная мотивация']
+        
+        # Обычная логика
+        if row['проектная мотивация'] == 1:
+            return row['ЧТО-ТО'] - row['ВСЕГО']
+        else:
+            return ''
+    
+    df['отдельная мотивация'] = df.apply(calc_separate_motivation, axis=1)
     
     return df
 
