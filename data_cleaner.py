@@ -205,60 +205,79 @@ def clean_data(df):
     
     return cleaned_df, deleted_df
 
-
-def fill_rs_and_em(cleaned_df, projects_df, name_login_df):
+def fill_login_rs_from_projects(cleaned_df, projects_df):
     """
-    Заполняет колонки Логин RS и RS (бывшая ЭМ)
+    ШАГ 1.1: Заполняет Логин RS из справочника «Проекты вне чеккера»
+    
+    Условие: всегда (для всех строк)
+    Ключ: (BranchID, SetCode) = (номер локации, Код проекта)
     """
     df = cleaned_df.copy()
     
-    # ============ ШАГ 1: Заполнение Логин RS из "Проекты вне чеккера" ============
-    if projects_df is not None and not projects_df.empty:
-        project_dict = {}
-        for _, row in projects_df.iterrows():
-            key = (str(row['номер локации']).strip(), str(row['Код проекта']).strip())
-            project_dict[key] = str(row['логин ЭМ кто назначил']).strip()
-        
-        def get_login_rs(row):
-            key = (str(row['BranchID']).strip(), str(row['SetCode']).strip())
-            return project_dict.get(key, row['Логин RS'])
-        
-        df['Логин RS'] = df.apply(get_login_rs, axis=1)
+    if projects_df is None or projects_df.empty:
+        return df
     
-    # ============ ШАГ 2: Дозаполнение Логин RS через RS (если пусто) ============
-    if name_login_df is not None and not name_login_df.empty:
-        login_to_name = {}
-        name_to_login = {}
-        for _, row in name_login_df.iterrows():
-            login = str(row['логин эм']).strip().lower()
-            name = str(row['ЭМ']).strip()
-            login_to_name[login] = name
-            name_to_login[name] = login
-        
-        def fill_login_rs(row):
-            login_rs = str(row['Логин RS']).strip()
-            rs_value = str(row['RS']).strip()
-            
-            if is_empty_value(login_rs) and not is_empty_value(rs_value):
-                if rs_value in name_to_login:
-                    return name_to_login[rs_value]
-            
-            return row['Логин RS']
-        
-        df['Логин RS'] = df.apply(fill_login_rs, axis=1)
-        
-        # ============ ШАГ 3: Заполнение RS (бывшая ЭМ) ============
-        def get_rs(row):
-            rs_value = str(row['RS']).strip()
-            login_rs = str(row['Логин RS']).strip()
-            
-            if is_empty_value(rs_value) or 'koordinator' in rs_value.lower() or 'rukovoditel' in rs_value.lower():
-                if login_rs.lower() in login_to_name:
-                    return login_to_name[login_rs.lower()]
-            
-            return row['RS']
+    # Создаем словарь: (номер локации, Код проекта) → логин ЭМ кто назначил
+    project_dict = {}
+    for _, row in projects_df.iterrows():
+        key = (str(row['номер локации']).strip(), str(row['Код проекта']).strip())
+        project_dict[key] = str(row['логин ЭМ кто назначил']).strip()
     
-        df['RS'] = df.apply(get_rs, axis=1)
+    def get_login_rs(row):
+        key = (str(row['BranchID']).strip(), str(row['SetCode']).strip())
+        return project_dict.get(key, row['Логин RS'])
+    
+    df['Логин RS'] = df.apply(get_login_rs, axis=1)
+    
+    return df
+
+
+def fill_rs_and_login_from_name_login(cleaned_df, name_login_df):
+    """
+    ШАГ 1.2 и 1.3: Работа со справочником «Имя-логин»
+    
+    ШАГ 1.2: Если RS заполнено И Логин RS пусто → ищем RS в ЭМ → берем логин эм → пишем в Логин RS
+    ШАГ 1.3: Если RS пусто/мусор → ищем Логин RS в логин эм → берем ЭМ → пишем в RS
+    """
+    df = cleaned_df.copy()
+    
+    if name_login_df is None or name_login_df.empty:
+        return df
+    
+    # Создаем два словаря
+    login_to_name = {}
+    name_to_login = {}
+    for _, row in name_login_df.iterrows():
+        login = str(row['логин эм']).strip().lower()
+        name = str(row['ЭМ']).strip()
+        login_to_name[login] = name
+        name_to_login[name] = login
+    
+    # ============ ШАГ 1.2: Дозаполнение Логин RS через RS ============
+    def fill_login_rs(row):
+        login_rs = str(row['Логин RS']).strip()
+        rs_value = str(row['RS']).strip()
+        
+        if is_empty_value(login_rs) and not is_empty_value(rs_value):
+            if rs_value in name_to_login:
+                return name_to_login[rs_value]
+        
+        return row['Логин RS']
+    
+    df['Логин RS'] = df.apply(fill_login_rs, axis=1)
+    
+    # ============ ШАГ 1.3: Заполнение RS через Логин RS ============
+    def get_rs(row):
+        rs_value = str(row['RS']).strip()
+        login_rs = str(row['Логин RS']).strip()
+        
+        if is_empty_value(rs_value) or 'koordinator' in rs_value.lower() or 'rukovoditel' in rs_value.lower():
+            if login_rs.lower() in login_to_name:
+                return login_to_name[login_rs.lower()]
+        
+        return row['RS']
+    
+    df['RS'] = df.apply(get_rs, axis=1)
     
     return df
 
