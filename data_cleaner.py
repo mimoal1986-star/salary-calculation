@@ -603,7 +603,7 @@ def fill_multon(cleaned_df, multon_df):
         return df
 
     if 'CritID' not in df.columns:
-    return df
+        return df
     
     # Создаем словарь: Номер анкеты с ПО → (логин ЭМ кто назначил, Проектная)
     multon_dict = {}
