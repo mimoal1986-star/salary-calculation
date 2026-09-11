@@ -6,7 +6,8 @@ from datetime import datetime
 from data_loader import load_excel, validate_columns, clear_cache
 from data_cleaner import (
     clean_data,
-    fill_rs_and_em,
+    fill_login_rs_from_projects,
+    fill_rs_and_login_from_name_login,
     fill_login_rs_from_distribution,
     fill_rs_login_from_projects,
     fill_multon,
@@ -230,13 +231,19 @@ with tab1:
                     # ============================================================
                     # 3. ЗАПОЛНЕНИЕ Логин RS и RS
                     # ============================================================
-                    progress_bar.progress(25, text="Заполнение Логин RS и RS...")
-                    if st.session_state.projects_outside_checker_df is not None:
-                        cleaned_df = fill_rs_and_em(
-                            cleaned_df,
-                            st.session_state.projects_outside_checker_df,
-                            st.session_state.name_login_df
-                        )
+                    # Заполнение Логин RS из «Проекты вне чеккера»
+                    progress_bar.progress(25, text="Заполнение Логин RS из Проекты вне чеккера...")
+                    cleaned_df = fill_login_rs_from_projects(
+                        cleaned_df,
+                        st.session_state.projects_outside_checker_df  # может быть None
+                    )
+                    
+                    # Работа со справочником «Имя-логин»
+                    progress_bar.progress(27, text="Заполнение RS и Логин RS из Имя-логин...")
+                    cleaned_df = fill_rs_and_login_from_name_login(
+                        cleaned_df,
+                        st.session_state.name_login_df  # может быть None
+                    )
 
                     progress_bar.progress(28, text="Дозаполнение Логин RS из Распределения...")
                     distribution_data = load_from_json_github('distribution')
